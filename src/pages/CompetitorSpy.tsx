@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Search, TrendingUp, Users, Video, Lightbulb, Target, AlertTriangle, CheckCircle, ExternalLink, Sparkles } from 'lucide-react';
+import { Eye, Search, TrendingUp, Users, Video, Lightbulb, Target, AlertTriangle, CheckCircle, ExternalLink, Sparkles, Send, MessageSquare } from 'lucide-react';
 
 interface TopVideo {
     id: string;
@@ -39,6 +39,11 @@ export default function CompetitorSpy() {
     const [analysis, setAnalysis] = useState<Analysis | null>(null);
     const [error, setError] = useState('');
 
+    // AI Chat
+    const [question, setQuestion] = useState('');
+    const [chatLoading, setChatLoading] = useState(false);
+    const [chatHistory, setChatHistory] = useState<Array<{ role: string, content: string }>>([]);
+
     const handleAnalyze = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!channelName.trim()) return;
@@ -46,6 +51,7 @@ export default function CompetitorSpy() {
         setLoading(true);
         setError('');
         setAnalysis(null);
+        setChatHistory([]);
 
         try {
             const response = await fetch('/api/analyze-competitor', {
@@ -74,6 +80,42 @@ export default function CompetitorSpy() {
         return 'var(--error)';
     };
 
+    const askAI = async () => {
+        if (!question.trim() || chatLoading) return;
+
+        const userQuestion = question;
+        setQuestion('');
+        setChatHistory(prev => [...prev, { role: 'user', content: userQuestion }]);
+        setChatLoading(true);
+
+        try {
+            const context = analysis
+                ? `User analyzed ${analysis.channelName} (${analysis.subscribers} subs, ${analysis.totalViews} views). Lessons: ${analysis.lessonsToSteal?.join(', ')}. Weaknesses: ${analysis.weaknesses?.join(', ')}. They ask:`
+                : `User is researching competitors. They ask:`;
+
+            const response = await fetch('/api/ai-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: `You are a YouTube growth strategist. Help the user beat their competition. Be specific about tactics they can use. ${context}` },
+                        ...chatHistory.map(m => ({ role: m.role, content: m.content })),
+                        { role: 'user', content: userQuestion }
+                    ]
+                })
+            });
+
+            const data = await response.json();
+            if (data.message) {
+                setChatHistory(prev => [...prev, { role: 'assistant', content: data.message }]);
+            }
+        } catch (err) {
+            setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not respond.' }]);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
     return (
         <div className="animate-fadeIn">
             <div className="page-header">
@@ -84,33 +126,71 @@ export default function CompetitorSpy() {
                 <p>Deep AI analysis of any YouTube channel - uncover their secrets</p>
             </div>
 
-            {/* Search */}
-            <form onSubmit={handleAnalyze} className="card mb-6">
-                <div className="flex gap-3">
-                    <div className="form-group flex-1" style={{ marginBottom: 0 }}>
+            {/* Search + Chat Row */}
+            <div className="grid grid-cols-3 gap-6 mb-6">
+                <div className="col-span-2">
+                    <form onSubmit={handleAnalyze} className="card">
+                        <div className="flex gap-3">
+                            <div className="form-group flex-1" style={{ marginBottom: 0 }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Enter channel name or @handle (e.g., @MrBeast)"
+                                    value={channelName}
+                                    onChange={(e) => setChannelName(e.target.value)}
+                                />
+                            </div>
+                            <button type="submit" className="btn btn-primary" disabled={loading || !channelName.trim()}>
+                                {loading ? (
+                                    <span className="loading-spinner" style={{ width: 20, height: 20 }} />
+                                ) : (
+                                    <><Search size={18} /> Analyze</>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {/* AI Chat */}
+                <div className="card">
+                    <h3 className="card-title flex items-center gap-2 mb-3" style={{ fontSize: '0.9rem' }}>
+                        <MessageSquare size={16} style={{ color: 'var(--accent-primary)' }} />
+                        Ask Competition AI
+                    </h3>
+
+                    {chatHistory.length > 0 && (
+                        <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '0.75rem' }} className="space-y-2">
+                            {chatHistory.map((msg, i) => (
+                                <div key={i} style={{
+                                    padding: '0.4rem 0.6rem',
+                                    borderRadius: '0.4rem',
+                                    background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                                    fontSize: '0.8rem'
+                                }}>
+                                    {msg.content}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Enter channel name or @handle (e.g., @MrBeast)"
-                            value={channelName}
-                            onChange={(e) => setChannelName(e.target.value)}
+                            placeholder="How do I beat them?"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && askAI()}
+                            style={{ fontSize: '0.8rem', padding: '0.5rem' }}
                         />
+                        <button onClick={askAI} className="btn btn-primary btn-sm" disabled={chatLoading}>
+                            <Send size={14} />
+                        </button>
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={loading || !channelName.trim()}>
-                        {loading ? (
-                            <span className="loading-spinner" style={{ width: 20, height: 20 }} />
-                        ) : (
-                            <><Search size={18} /> Analyze</>
-                        )}
-                    </button>
                 </div>
-            </form>
+            </div>
 
-            {error && (
-                <div className="alert alert-error mb-4">
-                    {error}
-                </div>
-            )}
+            {error && <div className="alert alert-error mb-4">{error}</div>}
 
             {loading && (
                 <div className="card">
@@ -167,7 +247,6 @@ export default function CompetitorSpy() {
                                 </div>
                             </div>
 
-                            {/* Overall Score */}
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{
                                     width: 80,

@@ -1,4 +1,4 @@
-// Find unsaturated niches using Groq AI
+// Find unsaturated niches using Groq AI with 2026 trends
 export async function handler(event) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -35,18 +35,32 @@ export async function handler(event) {
             };
         }
 
-        const systemPrompt = `You are an expert market researcher and content strategist specializing in YouTube and TikTok. You have deep knowledge of trending topics, audience behavior, and content gaps across all niches.
+        const systemPrompt = `You are an expert market researcher and content strategist specializing in YouTube and TikTok in January 2026. You have real-time knowledge of:
 
-Your expertise includes:
-- Identifying underserved sub-niches with high growth potential
-- Analyzing competition levels accurately
-- Predicting viral trends before they explode
-- Understanding search volume and audience demand
-- Spotting content gaps that creators can fill
+- Current trending topics and viral content formats in 2026
+- AI-generated content trends and regulations
+- Short-form video algorithm changes
+- Emerging platforms and features (YouTube Shorts, TikTok Shop, etc.)
+- Creator economy trends and monetization opportunities
+- Generation Alpha and Gen Z content preferences
 
-Always provide data-driven, actionable insights that help creators find their unique angle.`;
+Your analysis is based on the latest 2026 data including:
+- Current viral trends and challenges
+- Emerging technology niches (AI, VR, Web3, quantum computing)
+- New content formats gaining traction
+- Geographic trends and localized content opportunities
+- Cross-platform content strategies
 
-        const userPrompt = `Analyze the "${category}" space and identify 5 UNSATURATED sub-niches with high viral potential for YouTube and TikTok.
+Always provide cutting-edge, data-driven insights that help creators find untapped opportunities.`;
+
+        const userPrompt = `Analyze the "${category}" space as of January 2026 and identify 6 UNSATURATED sub-niches with high viral potential for YouTube and TikTok.
+
+Consider these 2026 factors:
+- AI content creation tools impact
+- New monetization features 
+- Algorithm changes favoring certain content types
+- Emerging audience segments
+- Cross-platform synergies
 
 For each niche, provide EXACTLY this JSON format:
 {
@@ -54,19 +68,20 @@ For each niche, provide EXACTLY this JSON format:
     {
       "name": "Specific niche name",
       "competition": "low" or "medium" or "high",
-      "potential": 75-95 (number, higher means more viral potential),
-      "description": "2-3 sentences explaining why this niche is underserved and why it has potential",
-      "trendingTopics": ["topic1", "topic2", "topic3", "topic4", "topic5"],
-      "monthlySearches": "estimated monthly searches like '50K-100K'"
+      "potential": 75-98 (number, higher means more viral potential),
+      "description": "2-3 sentences explaining why this niche is underserved in 2026 and what makes it timely NOW",
+      "trendingTopics": ["5 specific video ideas that could go viral"],
+      "monthlySearches": "estimated monthly searches like '50K-100K'",
+      "whyNow": "One sentence on why 2026 is the perfect time for this niche"
     }
   ]
 }
 
 Focus on:
-1. Sub-niches that are SPECIFIC (not broad)
-2. Topics with growing interest but few quality creators
-3. Content angles that haven't been fully explored
-4. Niches where a new creator could realistically grow
+1. Sub-niches that are SPECIFIC and ACTIONABLE
+2. Topics with growing 2026 interest but few quality creators
+3. Content angles specific to current events and trends
+4. Niches where a new creator could realistically grow FAST
 
 IMPORTANT: Only return valid JSON, nothing else. Your response must be parseable JSON.`;
 
@@ -82,8 +97,8 @@ IMPORTANT: Only return valid JSON, nothing else. Your response must be parseable
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.8,
-                max_tokens: 2000
+                temperature: 0.85,
+                max_tokens: 3000
             })
         });
 
@@ -113,6 +128,7 @@ IMPORTANT: Only return valid JSON, nothing else. Your response must be parseable
             }
         } catch (parseError) {
             console.error('JSON parse error:', parseError);
+            console.error('Raw content:', content);
             // Fallback: create structured response from the text
             niches = [
                 {
@@ -121,7 +137,8 @@ IMPORTANT: Only return valid JSON, nothing else. Your response must be parseable
                     potential: 80,
                     description: 'Unable to parse AI response. Please try again.',
                     trendingTopics: ['trending', 'content', 'ideas'],
-                    monthlySearches: 'N/A'
+                    monthlySearches: 'N/A',
+                    whyNow: 'Try again for updated results'
                 }
             ];
         }
@@ -137,7 +154,7 @@ IMPORTANT: Only return valid JSON, nothing else. Your response must be parseable
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: 'Failed to find niches' })
+            body: JSON.stringify({ error: 'Failed to find niches: ' + error.message })
         };
     }
 }

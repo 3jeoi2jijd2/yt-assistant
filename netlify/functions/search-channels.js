@@ -1,4 +1,4 @@
-// Search YouTube channels by niche
+// Search YouTube channels by niche using AI recommendations
 export async function handler(event) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -25,24 +25,70 @@ export async function handler(event) {
             };
         }
 
-        const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+        const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-        if (!YOUTUBE_API_KEY) {
+        if (!GROQ_API_KEY) {
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: 'YouTube API key not configured' })
+                body: JSON.stringify({ error: 'API key not configured' })
             };
         }
 
-        // Search for channels
-        const searchResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=channel&maxResults=12&key=${YOUTUBE_API_KEY}`
-        );
+        // Use AI to recommend channels in this niche
+        const systemPrompt = `You are a YouTube expert with extensive knowledge of creators across all niches as of January 2026. You know the most successful and growing channels in every category.
 
-        if (!searchResponse.ok) {
-            const errorData = await searchResponse.json();
-            console.error('YouTube API error:', errorData);
+When asked about a niche, provide REAL YouTube channels that exist and are active. Include a mix of:
+- Large established channels (1M+ subscribers)
+- Medium growing channels (100K-1M subscribers)  
+- Rising stars (10K-100K subscribers)
+
+Be accurate with channel names and approximate statistics based on your knowledge.`;
+
+        const userPrompt = `Find 8-10 top YouTube channels in the "${query}" niche.
+
+For each channel, provide:
+- Exact channel name (real channels only)
+- Approximate subscriber count (as of 2026)
+- Approximate total video count
+- Approximate total view count
+- Brief description of their content (1-2 sentences)
+
+Return as JSON array with this exact format:
+[
+  {
+    "id": "channel-name-slug",
+    "title": "Channel Name",
+    "description": "Brief description of what they create",
+    "thumbnail": "",
+    "subscriberCount": "1500000",
+    "videoCount": "250",
+    "viewCount": "500000000"
+  }
+]
+
+Only return the JSON array, no other text.`;
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Groq API error:', errorData);
             return {
                 statusCode: 500,
                 headers,
@@ -50,49 +96,31 @@ export async function handler(event) {
             };
         }
 
-        const searchData = await searchResponse.json();
+        const data = await response.json();
+        let channelsText = data.choices[0]?.message?.content || '[]';
 
-        if (!searchData.items || searchData.items.length === 0) {
-            return {
-                statusCode: 200,
-                headers,
-                body: JSON.stringify({ channels: [] })
-            };
+        // Extract JSON from response
+        const jsonMatch = channelsText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            channelsText = jsonMatch[0];
         }
 
-        // Get channel IDs
-        const channelIds = searchData.items.map(item => item.id.channelId).join(',');
-
-        // Get detailed channel statistics
-        const statsResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelIds}&key=${YOUTUBE_API_KEY}`
-        );
-
-        if (!statsResponse.ok) {
-            const errorData = await statsResponse.json();
-            console.error('YouTube API stats error:', errorData);
-            return {
-                statusCode: 500,
-                headers,
-                body: JSON.stringify({ error: 'Failed to get channel statistics' })
-            };
+        let channels = [];
+        try {
+            channels = JSON.parse(channelsText);
+        } catch (e) {
+            console.error('Failed to parse channels:', e);
+            channels = [];
         }
 
-        const statsData = await statsResponse.json();
-
-        // Format channel data
-        const channels = statsData.items.map(channel => ({
-            id: channel.id,
-            title: channel.snippet.title,
-            description: channel.snippet.description,
-            thumbnail: channel.snippet.thumbnails.medium?.url || channel.snippet.thumbnails.default?.url,
-            subscriberCount: channel.statistics.subscriberCount || '0',
-            videoCount: channel.statistics.videoCount || '0',
-            viewCount: channel.statistics.viewCount || '0'
+        // Add placeholder thumbnails
+        channels = channels.map(ch => ({
+            ...ch,
+            thumbnail: `https://ui-avatars.com/api/?name=${encodeURIComponent(ch.title)}&size=88&background=6366f1&color=fff`
         }));
 
         // Sort by subscriber count (highest first)
-        channels.sort((a, b) => parseInt(b.subscriberCount) - parseInt(a.subscriberCount));
+        channels.sort((a, b) => parseInt(b.subscriberCount || 0) - parseInt(a.subscriberCount || 0));
 
         return {
             statusCode: 200,
@@ -105,7 +133,7 @@ export async function handler(event) {
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: 'Failed to search channels' })
+            body: JSON.stringify({ error: 'Failed to search channels: ' + error.message })
         };
     }
 }

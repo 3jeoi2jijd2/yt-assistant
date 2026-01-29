@@ -8,7 +8,8 @@ import {
     TrendingUp,
     Clock,
     Trash2,
-    ChevronRight
+    ChevronRight,
+    AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -36,7 +37,7 @@ interface NicheItem {
 }
 
 export default function Dashboard() {
-    const { user } = useAuth();
+    const { user, isMockMode } = useAuth();
     const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
     const [scripts, setScripts] = useState<ScriptItem[]>([]);
     const [niches, setNiches] = useState<NicheItem[]>([]);
@@ -44,10 +45,15 @@ export default function Dashboard() {
     const [activeTab, setActiveTab] = useState<'transcripts' | 'scripts' | 'niches'>('transcripts');
 
     useEffect(() => {
+        if (isMockMode) {
+            // In mock mode, just show empty state
+            setLoading(false);
+            return;
+        }
         if (user) {
             loadData();
         }
-    }, [user]);
+    }, [user, isMockMode]);
 
     const loadData = async () => {
         if (!user) return;

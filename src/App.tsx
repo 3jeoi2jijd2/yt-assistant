@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import {
-    Video,
     FileText,
     Search,
     TrendingUp,
@@ -10,17 +9,34 @@ import {
     Sparkles,
     Menu,
     X,
-    AlertTriangle
+    AlertTriangle,
+    Image,
+    Type,
+    Hash,
+    Zap,
+    AlignLeft,
+    Calendar,
+    Radar,
+    Eye
 } from 'lucide-react';
 import { useState } from 'react';
 
 // Pages
-import Transcriber from './pages/Transcriber';
 import ScriptGenerator from './pages/ScriptGenerator';
 import ChannelFinder from './pages/ChannelFinder';
 import NicheFinder from './pages/NicheFinder';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
+
+// New Pages
+import ThumbnailAnalyzer from './pages/ThumbnailAnalyzer';
+import TitleGenerator from './pages/TitleGenerator';
+import HashtagGenerator from './pages/HashtagGenerator';
+import HookGenerator from './pages/HookGenerator';
+import DescriptionWriter from './pages/DescriptionWriter';
+import ContentCalendar from './pages/ContentCalendar';
+import TrendRadar from './pages/TrendRadar';
+import CompetitorSpy from './pages/CompetitorSpy';
 
 import './index.css';
 
@@ -47,31 +63,74 @@ function Sidebar() {
                 {isMockMode && (
                     <div className="alert alert-warning mb-4" style={{ fontSize: '0.75rem', padding: '0.5rem' }}>
                         <AlertTriangle size={14} />
-                        Demo Mode - Setup Supabase for full features
+                        Demo Mode
                     </div>
                 )}
 
                 <nav className="sidebar-nav">
-                    <NavLink to="/transcriber" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <Video size={20} />
-                        Transcriber
-                    </NavLink>
-                    <NavLink to="/script-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <FileText size={20} />
-                        Script Generator
-                    </NavLink>
-                    <NavLink to="/channel-finder" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <Search size={20} />
-                        Channel Finder
-                    </NavLink>
-                    <NavLink to="/niche-finder" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <TrendingUp size={20} />
-                        Niche Finder
-                    </NavLink>
-                    <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <LayoutDashboard size={20} />
-                        Dashboard
-                    </NavLink>
+                    <div className="nav-section">
+                        <span className="nav-section-title">Create</span>
+                        <NavLink to="/script-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <FileText size={20} />
+                            Script Generator
+                        </NavLink>
+                        <NavLink to="/title-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Type size={20} />
+                            Viral Titles
+                        </NavLink>
+                        <NavLink to="/hook-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Zap size={20} />
+                            Hook Generator
+                        </NavLink>
+                        <NavLink to="/description-writer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <AlignLeft size={20} />
+                            Description Writer
+                        </NavLink>
+                        <NavLink to="/hashtag-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Hash size={20} />
+                            Hashtag Generator
+                        </NavLink>
+                    </div>
+
+                    <div className="nav-section">
+                        <span className="nav-section-title">Analyze</span>
+                        <NavLink to="/thumbnail-analyzer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Image size={20} />
+                            Thumbnail Analyzer
+                        </NavLink>
+                        <NavLink to="/competitor-spy" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Eye size={20} />
+                            Competitor Spy
+                        </NavLink>
+                    </div>
+
+                    <div className="nav-section">
+                        <span className="nav-section-title">Research</span>
+                        <NavLink to="/trend-radar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Radar size={20} />
+                            Trend Radar
+                        </NavLink>
+                        <NavLink to="/niche-finder" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <TrendingUp size={20} />
+                            Niche Finder
+                        </NavLink>
+                        <NavLink to="/channel-finder" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Search size={20} />
+                            Channel Finder
+                        </NavLink>
+                    </div>
+
+                    <div className="nav-section">
+                        <span className="nav-section-title">Plan</span>
+                        <NavLink to="/content-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Calendar size={20} />
+                            Content Calendar
+                        </NavLink>
+                        <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <LayoutDashboard size={20} />
+                            Dashboard
+                        </NavLink>
+                    </div>
                 </nav>
 
                 {user && (
@@ -102,7 +161,6 @@ function AppContent() {
         );
     }
 
-    // In mock mode, always show the app (skip auth)
     const showApp = user || isMockMode;
 
     return (
@@ -110,13 +168,29 @@ function AppContent() {
             {showApp && <Sidebar />}
             <main className="main-content" style={!showApp ? { marginLeft: 0 } : {}}>
                 <Routes>
-                    <Route path="/auth" element={showApp ? <Navigate to="/transcriber" /> : <Auth />} />
-                    <Route path="/transcriber" element={showApp ? <Transcriber /> : <Navigate to="/auth" />} />
+                    <Route path="/auth" element={showApp ? <Navigate to="/script-generator" /> : <Auth />} />
+
+                    {/* Create */}
                     <Route path="/script-generator" element={showApp ? <ScriptGenerator /> : <Navigate to="/auth" />} />
-                    <Route path="/channel-finder" element={showApp ? <ChannelFinder /> : <Navigate to="/auth" />} />
+                    <Route path="/title-generator" element={showApp ? <TitleGenerator /> : <Navigate to="/auth" />} />
+                    <Route path="/hook-generator" element={showApp ? <HookGenerator /> : <Navigate to="/auth" />} />
+                    <Route path="/description-writer" element={showApp ? <DescriptionWriter /> : <Navigate to="/auth" />} />
+                    <Route path="/hashtag-generator" element={showApp ? <HashtagGenerator /> : <Navigate to="/auth" />} />
+
+                    {/* Analyze */}
+                    <Route path="/thumbnail-analyzer" element={showApp ? <ThumbnailAnalyzer /> : <Navigate to="/auth" />} />
+                    <Route path="/competitor-spy" element={showApp ? <CompetitorSpy /> : <Navigate to="/auth" />} />
+
+                    {/* Research */}
+                    <Route path="/trend-radar" element={showApp ? <TrendRadar /> : <Navigate to="/auth" />} />
                     <Route path="/niche-finder" element={showApp ? <NicheFinder /> : <Navigate to="/auth" />} />
+                    <Route path="/channel-finder" element={showApp ? <ChannelFinder /> : <Navigate to="/auth" />} />
+
+                    {/* Plan */}
+                    <Route path="/content-calendar" element={showApp ? <ContentCalendar /> : <Navigate to="/auth" />} />
                     <Route path="/dashboard" element={showApp ? <Dashboard /> : <Navigate to="/auth" />} />
-                    <Route path="*" element={<Navigate to={showApp ? "/transcriber" : "/auth"} replace />} />
+
+                    <Route path="*" element={<Navigate to={showApp ? "/script-generator" : "/auth"} replace />} />
                 </Routes>
             </main>
         </div>

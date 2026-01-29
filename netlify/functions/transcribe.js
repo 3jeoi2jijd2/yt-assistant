@@ -1,4 +1,4 @@
-// Transcribe YouTube video using multiple methods
+// Transcribe YouTube video using multiple reliable methods
 export async function handler(event) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -25,9 +25,9 @@ export async function handler(event) {
             };
         }
 
-        console.log('Attempting to transcribe video:', videoId);
+        console.log('Fetching transcript for video:', videoId);
 
-        // Get video title first
+        // Get video title first using oembed (no API key needed)
         let videoTitle = 'YouTube Video';
         try {
             const oembedRes = await fetch(
@@ -38,50 +38,78 @@ export async function handler(event) {
                 videoTitle = oembed.title || 'YouTube Video';
             }
         } catch (e) {
-            console.log('Could not fetch video title');
+            console.log('Could not fetch video title via oembed');
         }
 
         let transcript = null;
 
-        // Method 1: Use the public transcript API
+        // Method 1: Try Tactiq's free transcript service
         try {
-            const transcriptRes = await fetch(
-                `https://www.searchapi.io/api/v1/search?engine=youtube_transcripts&video_id=${videoId}&api_key=demo`
-            );
-            if (transcriptRes.ok) {
-                const data = await transcriptRes.json();
-                if (data.transcripts && data.transcripts.length > 0) {
-                    transcript = data.transcripts
-                        .map(t => t.text)
+            const tactiqRes = await fetch(`https://tactiq-apps-prod.tactiq.io/transcript`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ videoId })
+            });
+
+            if (tactiqRes.ok) {
+                const data = await tactiqRes.json();
+                if (data.captions && data.captions.length > 0) {
+                    transcript = data.captions
+                        .map(c => c.text)
                         .join(' ')
                         .replace(/\s+/g, ' ')
                         .trim();
                 }
             }
         } catch (e) {
-            console.log('Method 1 failed:', e.message);
+            console.log('Tactiq method failed:', e.message);
         }
 
-        // Method 2: Try kome.ai transcript API
+        // Method 2: Try YouTube's built-in timedtext endpoint
         if (!transcript) {
             try {
-                const komeRes = await fetch(
-                    `https://kome.ai/api/transcript?url=https://www.youtube.com/watch?v=${videoId}`,
-                    { headers: { 'Accept': 'application/json' } }
-                );
-                if (komeRes.ok) {
-                    const komeData = await komeRes.json();
-                    if (komeData.transcript) {
-                        transcript = komeData.transcript;
+                // First get the video page to extract caption tracks
+                const videoPageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
+                const videoPageHtml = await videoPageRes.text();
+
+                // Extract caption track URL from the page
+                const captionMatch = videoPageHtml.match(/"captionTracks":\[(.*?)\]/);
+                if (captionMatch) {
+                    try {
+                        const captionData = JSON.parse('[' + captionMatch[1] + ']');
+                        const englishCaption = captionData.find(c =>
+                            c.languageCode === 'en' ||
+                            c.languageCode === 'en-US' ||
+                            c.languageCode === 'en-GB'
+                        ) || captionData[0];
+
+                        if (englishCaption && englishCaption.baseUrl) {
+                            // Fetch the actual captions
+                            const captionRes = await fetch(englishCaption.baseUrl + '&fmt=json3');
+                            if (captionRes.ok) {
+                                const captions = await captionRes.json();
+                                if (captions.events) {
+                                    transcript = captions.events
+                                        .filter(e => e.segs)
+                                        .map(e => e.segs.map(s => s.utf8 || '').join(''))
+                                        .join(' ')
+                                        .replace(/\s+/g, ' ')
+                                        .trim();
+                                }
+                            }
+                        }
+                    } catch (parseErr) {
+                        console.log('Failed to parse caption data:', parseErr.message);
                     }
                 }
             } catch (e) {
-                console.log('Method 2 failed:', e.message);
+                console.log('YouTube page method failed:', e.message);
             }
         }
 
-        // Method 3: Use Groq AI to generate a summary/content based on video ID
-        // This serves as a fallback when transcripts aren't available
+        // Method 3: Use AI to analyze the video if no transcript available
         if (!transcript) {
             const GROQ_API_KEY = process.env.GROQ_API_KEY;
             if (GROQ_API_KEY) {
@@ -97,22 +125,21 @@ export async function handler(event) {
                             messages: [
                                 {
                                     role: 'system',
-                                    content: 'You are a helpful assistant that provides information about YouTube videos based on their titles and context.'
+                                    content: `You are an expert content analyst. When a user provides a YouTube video title, you provide a comprehensive analysis of what the video likely contains based on the title, including:
+- Main topic and key points that would be covered
+- Typical structure for this type of content
+- Key talking points and insights
+- Relevant keywords and themes
+
+Format the analysis as if it were a detailed summary/transcript of the video content.`
                                 },
                                 {
                                     role: 'user',
-                                    content: `I'm trying to analyze a YouTube video titled "${videoTitle}" (Video ID: ${videoId}). 
-                                    
-Since I couldn't retrieve the transcript, please provide:
-1. What this video is likely about based on the title
-2. Key topics that would typically be covered
-3. A suggested structure for similar content
-
-Format your response as if it were a transcript summary. Be helpful and informative.`
+                                    content: `The YouTube video "${videoTitle}" (ID: ${videoId}) doesn't have accessible captions. Please provide a comprehensive analysis of what this video likely covers based on its title. Create a detailed content summary that can be used for reference.`
                                 }
                             ],
                             temperature: 0.7,
-                            max_tokens: 1500
+                            max_tokens: 2000
                         })
                     });
 
@@ -124,15 +151,16 @@ Format your response as if it were a transcript summary. Be helpful and informat
                                 statusCode: 200,
                                 headers,
                                 body: JSON.stringify({
-                                    transcript: `[AI-Generated Analysis - Transcript not available]\n\n${aiContent}`,
+                                    transcript: `📝 AI-GENERATED ANALYSIS (Captions not available)\n\n${aiContent}`,
                                     title: videoTitle,
-                                    isAIGenerated: true
+                                    isAIGenerated: true,
+                                    note: 'This video does not have accessible captions. We generated an AI analysis based on the title.'
                                 })
                             };
                         }
                     }
                 } catch (e) {
-                    console.log('AI fallback failed:', e.message);
+                    console.log('AI analysis failed:', e.message);
                 }
             }
         }
@@ -142,7 +170,7 @@ Format your response as if it were a transcript summary. Be helpful and informat
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({
-                    error: 'Could not fetch transcript. The video may not have captions, or captions are disabled. Try a different video with manual captions.'
+                    error: 'Could not fetch transcript. This video may not have captions enabled, or the captions are in a format we cannot access. Try a video with manually added English captions.'
                 })
             };
         }

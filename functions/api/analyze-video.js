@@ -1,4 +1,4 @@
-// Cloudflare Pages Function: Analyze Video with Transcript support
+// Cloudflare Pages Function: Analyze Video with REAL Transcript
 
 export async function onRequestPost(context) {
     const corsHeaders = {
@@ -19,10 +19,10 @@ export async function onRequestPost(context) {
             });
         }
 
-        // Extract video ID - supports regular, shorts, and embed URLs
+        // Extract video ID
         const videoId = extractVideoId(videoUrl);
         if (!videoId) {
-            return new Response(JSON.stringify({ error: 'Invalid YouTube URL. Supported formats: youtube.com/watch, youtu.be, youtube.com/shorts' }), {
+            return new Response(JSON.stringify({ error: 'Invalid YouTube URL. Supported: youtube.com/watch, youtube.com/shorts, youtu.be' }), {
                 status: 400,
                 headers: corsHeaders
             });
@@ -57,29 +57,69 @@ export async function onRequestPost(context) {
             tags: video.snippet.tags || []
         };
 
-        // Try to get captions/transcript
+        // FETCH REAL TRANSCRIPT
         let transcript = null;
-        let captionsAvailable = false;
+        let transcriptText = '';
 
         try {
-            // Get captions list
-            const captionsRes = await fetch(
-                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${youtubeKey}`
+            // Try to get YouTube auto-generated captions via the timedtext API
+            const transcriptRes = await fetch(
+                `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`
             );
-            const captionsData = await captionsRes.json();
 
-            if (captionsData.items?.length > 0) {
-                captionsAvailable = true;
-                // Find English captions
-                const englishCaption = captionsData.items.find(c =>
-                    c.snippet.language === 'en' || c.snippet.language?.startsWith('en')
-                ) || captionsData.items[0];
+            if (transcriptRes.ok) {
+                const transcriptData = await transcriptRes.json();
 
-                // Note: Actually downloading captions requires OAuth
-                // We'll use the description and available info for analysis
+                if (transcriptData.events) {
+                    // Parse the transcript events into readable text
+                    transcript = transcriptData.events
+                        .filter(e => e.segs && e.segs.length > 0)
+                        .map(event => {
+                            const startMs = event.tStartMs || 0;
+                            const startSec = Math.floor(startMs / 1000);
+                            const minutes = Math.floor(startSec / 60);
+                            const seconds = startSec % 60;
+                            const timestamp = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                            const text = event.segs.map(s => s.utf8 || '').join('').trim();
+                            return { timestamp, text, startMs };
+                        })
+                        .filter(e => e.text);
+
+                    // Create full text version
+                    transcriptText = transcript.map(t => t.text).join(' ');
+                }
+            }
+
+            // Fallback: Try alternative endpoint
+            if (!transcript) {
+                const altRes = await fetch(
+                    `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`
+                );
+
+                if (altRes.ok) {
+                    const xmlText = await altRes.text();
+                    // Parse XML transcript
+                    const textMatches = xmlText.match(/<text[^>]*>([\s\S]*?)<\/text>/g);
+                    if (textMatches) {
+                        transcript = textMatches.map((match, i) => {
+                            const startMatch = match.match(/start="([\d.]+)"/);
+                            const textContent = match.replace(/<[^>]+>/g, '').trim();
+                            const startSec = startMatch ? parseFloat(startMatch[1]) : i * 5;
+                            const minutes = Math.floor(startSec / 60);
+                            const seconds = Math.floor(startSec % 60);
+                            return {
+                                timestamp: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+                                text: decodeHTMLEntities(textContent),
+                                startMs: startSec * 1000
+                            };
+                        }).filter(t => t.text);
+
+                        transcriptText = transcript.map(t => t.text).join(' ');
+                    }
+                }
             }
         } catch (e) {
-            console.log('Captions error:', e.message);
+            console.log('Transcript fetch error:', e.message);
         }
 
         // AI Analysis
@@ -89,7 +129,7 @@ export async function onRequestPost(context) {
         if (groqKey) {
             const engagementRate = videoInfo.views > 0 ? ((videoInfo.likes / videoInfo.views) * 100).toFixed(2) : 0;
 
-            // If user asked a question, answer it
+            // If user asked a question, answer it using the transcript
             if (question) {
                 const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
@@ -102,17 +142,16 @@ export async function onRequestPost(context) {
                         messages: [
                             {
                                 role: 'system',
-                                content: `You are an expert video analyst helping a creator understand this video. Answer questions based on the video metadata. Be specific and actionable.
+                                content: `You are an expert video analyst. Answer questions about this video using the transcript and metadata provided.
 
 VIDEO INFO:
 Title: ${videoInfo.title}
 Channel: ${videoInfo.channel}
 Views: ${formatNumber(videoInfo.views)}
-Likes: ${formatNumber(videoInfo.likes)}
 Engagement: ${engagementRate}%
-Duration: ${videoInfo.duration}
-Tags: ${videoInfo.tags.slice(0, 10).join(', ')}
-Description: ${videoInfo.description.substring(0, 1000)}`
+
+TRANSCRIPT:
+${transcriptText.substring(0, 8000) || 'Transcript not available'}`
                             },
                             { role: 'user', content: question }
                         ],
@@ -125,7 +164,25 @@ Description: ${videoInfo.description.substring(0, 1000)}`
                 chatResponse = chatData.choices?.[0]?.message?.content;
             }
 
-            // Full analysis
+            // Full analysis using real transcript
+            const analysisPrompt = transcriptText
+                ? `Analyze this video using the REAL transcript:
+
+TITLE: ${videoInfo.title}
+CHANNEL: ${videoInfo.channel}
+VIEWS: ${formatNumber(videoInfo.views)}
+ENGAGEMENT: ${engagementRate}%
+
+FULL TRANSCRIPT (first 8000 chars):
+${transcriptText.substring(0, 8000)}`
+                : `Analyze based on metadata only:
+
+TITLE: ${videoInfo.title}
+CHANNEL: ${videoInfo.channel}  
+VIEWS: ${formatNumber(videoInfo.views)}
+ENGAGEMENT: ${engagementRate}%
+DESCRIPTION: ${videoInfo.description.substring(0, 1500)}`;
+
             const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -137,34 +194,19 @@ Description: ${videoInfo.description.substring(0, 1000)}`
                     messages: [
                         {
                             role: 'system',
-                            content: `You are an elite viral content analyst. Analyze this video and return JSON:
+                            content: `Analyze this YouTube video and return JSON:
 {
   "viralScore": 85,
-  "hookAnalysis": "How effective is the title/thumbnail as a hook",
-  "contentStructure": "How the video is likely structured based on title/description",
+  "hookAnalysis": "Analysis of the opening hook",
+  "contentStructure": "How the video is structured",
   "whyItWorks": ["reason1", "reason2", "reason3"],
-  "viralFormulas": ["formula name: explanation"],
+  "viralFormulas": ["formula: explanation"],
   "lessonsForCreators": ["lesson1", "lesson2", "lesson3"],
-  "suggestedImprovements": ["improvement1", "improvement2"],
-  "estimatedRetention": "Retention pattern prediction",
-  "audienceInsight": "Who watches this and why",
-  "transcriptSummary": "Based on title/description, summarize what this video covers",
-  "keyMoments": ["key moment/topic 1", "key moment/topic 2", "key moment/topic 3"]
+  "keyMoments": ["moment1", "moment2", "moment3"],
+  "audienceInsight": "Who watches this and why"
 }`
                         },
-                        {
-                            role: 'user',
-                            content: `Analyze:
-TITLE: ${videoInfo.title}
-CHANNEL: ${videoInfo.channel}
-VIEWS: ${formatNumber(videoInfo.views)}
-LIKES: ${formatNumber(videoInfo.likes)}
-COMMENTS: ${formatNumber(videoInfo.comments)}
-ENGAGEMENT: ${engagementRate}%
-DURATION: ${videoInfo.duration}
-TAGS: ${videoInfo.tags.slice(0, 15).join(', ')}
-DESCRIPTION: ${videoInfo.description.substring(0, 1500)}`
-                        }
+                        { role: 'user', content: analysisPrompt }
                     ],
                     temperature: 0.7,
                     max_tokens: 1200
@@ -191,8 +233,9 @@ DESCRIPTION: ${videoInfo.description.substring(0, 1500)}`
                 viewsRaw: videoInfo.views,
                 likesRaw: videoInfo.likes
             },
-            captionsAvailable,
-            transcript,
+            hasTranscript: !!transcript && transcript.length > 0,
+            transcript,  // Full transcript with timestamps
+            transcriptText, // Plain text version
             analysis,
             chatResponse
         }), { headers: corsHeaders });
@@ -209,17 +252,11 @@ DESCRIPTION: ${videoInfo.description.substring(0, 1500)}`
 function extractVideoId(url) {
     if (!url) return null;
 
-    // Handle different URL formats
     const patterns = [
-        // Standard watch URL: youtube.com/watch?v=ID
         /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
-        // Short URL: youtu.be/ID
         /(?:youtu\.be\/)([^&\n?#]+)/,
-        // Embed URL: youtube.com/embed/ID
         /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
-        // Shorts URL: youtube.com/shorts/ID
         /(?:youtube\.com\/shorts\/)([^&\n?#]+)/,
-        // Just the ID
         /^([a-zA-Z0-9_-]{11})$/
     ];
 
@@ -234,6 +271,21 @@ function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
+}
+
+function decodeHTMLEntities(text) {
+    const entities = {
+        '&amp;': '&',
+        '&lt;': '<',
+        '&gt;': '>',
+        '&quot;': '"',
+        '&#39;': "'",
+        '&apos;': "'",
+        '&#x27;': "'",
+        '&#x2F;': '/',
+        '&#32;': ' '
+    };
+    return text.replace(/&[#\w]+;/g, match => entities[match] || match);
 }
 
 export async function onRequestOptions() {

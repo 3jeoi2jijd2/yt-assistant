@@ -1,4 +1,4 @@
-// Analyze competitor channel using Groq AI
+// Analyze competitor channel using YouTube Data API + Groq AI for insights
 
 export async function handler(event) {
     const headers = {
@@ -17,16 +17,119 @@ export async function handler(event) {
 
     try {
         const { channelName } = JSON.parse(event.body || '{}');
-        const apiKey = process.env.GROQ_API_KEY;
+        const groqKey = process.env.GROQ_API_KEY;
+        const youtubeKey = process.env.YOUTUBE_API_KEY;
 
-        if (!apiKey) {
-            throw new Error('API key not configured');
+        if (!groqKey) {
+            throw new Error('Groq API key not configured');
         }
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        // Clean up the channel name/handle
+        let searchQuery = channelName.trim();
+        if (searchQuery.startsWith('@')) {
+            searchQuery = searchQuery.substring(1);
+        }
+
+        let channelData = null;
+        let videos = [];
+
+        // Try to get real YouTube data if API key is available
+        if (youtubeKey) {
+            try {
+                // Search for the channel
+                const searchRes = await fetch(
+                    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(searchQuery)}&maxResults=1&key=${youtubeKey}`
+                );
+                const searchData = await searchRes.json();
+
+                if (searchData.items && searchData.items.length > 0) {
+                    const channelId = searchData.items[0].id.channelId;
+                    const channelSnippet = searchData.items[0].snippet;
+
+                    // Get channel statistics
+                    const channelRes = await fetch(
+                        `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet,brandingSettings&id=${channelId}&key=${youtubeKey}`
+                    );
+                    const channelInfo = await channelRes.json();
+
+                    if (channelInfo.items && channelInfo.items.length > 0) {
+                        const stats = channelInfo.items[0].statistics;
+                        const snippet = channelInfo.items[0].snippet;
+
+                        channelData = {
+                            id: channelId,
+                            name: snippet.title,
+                            description: snippet.description,
+                            customUrl: snippet.customUrl,
+                            thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
+                            subscribers: formatNumber(parseInt(stats.subscriberCount) || 0),
+                            totalViews: formatNumber(parseInt(stats.viewCount) || 0),
+                            videoCount: parseInt(stats.videoCount) || 0,
+                            country: snippet.country || 'Unknown'
+                        };
+
+                        // Get recent popular videos
+                        const videosRes = await fetch(
+                            `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=5&key=${youtubeKey}`
+                        );
+                        const videosData = await videosRes.json();
+
+                        if (videosData.items && videosData.items.length > 0) {
+                            const videoIds = videosData.items.map(v => v.id.videoId).join(',');
+
+                            // Get video statistics
+                            const videoStatsRes = await fetch(
+                                `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoIds}&key=${youtubeKey}`
+                            );
+                            const videoStatsData = await videoStatsRes.json();
+
+                            videos = (videoStatsData.items || []).map(v => ({
+                                title: v.snippet.title,
+                                views: formatNumber(parseInt(v.statistics.viewCount) || 0),
+                                likes: formatNumber(parseInt(v.statistics.likeCount) || 0),
+                                comments: formatNumber(parseInt(v.statistics.commentCount) || 0),
+                                thumbnail: v.snippet.thumbnails?.medium?.url,
+                                publishedAt: v.snippet.publishedAt
+                            }));
+                        }
+                    }
+                }
+            } catch (ytError) {
+                console.log('YouTube API error:', ytError.message);
+                // Fall through to AI-only analysis
+            }
+        }
+
+        // Use Groq AI for strategic insights
+        const aiPrompt = channelData
+            ? `Analyze this REAL YouTube channel and provide strategic insights:
+
+CHANNEL: ${channelData.name}
+SUBSCRIBERS: ${channelData.subscribers}
+TOTAL VIEWS: ${channelData.totalViews}
+VIDEO COUNT: ${channelData.videoCount}
+DESCRIPTION: ${channelData.description?.substring(0, 500)}
+
+TOP VIDEOS:
+${videos.map(v => `- "${v.title}" (${v.views} views, ${v.likes} likes)`).join('\n')}
+
+Based on this REAL data, provide:
+1. Content pattern analysis
+2. Target audience description
+3. 3-4 opportunities for competing creators
+4. 3-4 lessons to learn from this channel`
+            : `Analyze a YouTube creator in this niche: "${channelName}"
+
+Provide realistic, helpful insights for someone wanting to compete or learn from creators in this space:
+1. Typical content patterns in this niche
+2. Target audience for this niche
+3. 3-4 opportunities for new creators
+4. 3-4 lessons from successful creators in this niche`;
+
+        const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${groqKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -34,80 +137,70 @@ export async function handler(event) {
                 messages: [
                     {
                         role: 'system',
-                        content: `You are a YouTube strategy analyst. Analyze channels/niches and provide actionable insights.
-
-Generate REALISTIC analysis that would help a creator learn from successful competitors.
+                        content: `You are a YouTube strategy analyst. Provide actionable insights based on channel data.
 
 Return as JSON:
 {
-  "channelName": "Channel or niche name",
-  "subscribers": "Realistic sub count like 125K or 1.2M",
-  "avgViews": "Realistic avg views like 50K or 250K",
-  "uploadFrequency": "2-3 videos/week",
-  "topPerforming": [
-    {"title": "Video title example", "views": "1.2M", "why": "Why it performed well"}
-  ],
-  "contentPattern": "Description of their content strategy",
-  "audience": "Who watches this content",
-  "opportunities": ["Gap 1 you could fill", "Gap 2", "Gap 3"],
+  "contentPattern": "Description of their content strategy and patterns",
+  "audience": "Who watches this content - demographics and interests",
+  "opportunities": ["Opportunity 1", "Opportunity 2", "Opportunity 3"],
   "lessonsToLearn": ["Lesson 1", "Lesson 2", "Lesson 3"]
 }
 
-Be specific and actionable. Return ONLY valid JSON.`
+Be specific, actionable, and insightful. Return ONLY valid JSON.`
                     },
                     {
                         role: 'user',
-                        content: `Analyze this creator/channel/niche and provide strategic insights: "${channelName}"`
+                        content: aiPrompt
                     }
                 ],
-                temperature: 0.8,
-                max_tokens: 800
+                temperature: 0.7,
+                max_tokens: 600
             })
         });
 
-        const data = await response.json();
+        const aiData = await aiResponse.json();
+        const aiContent = aiData.choices?.[0]?.message?.content || '';
 
-        if (!response.ok) {
-            throw new Error(data.error?.message || 'Failed to analyze competitor');
-        }
-
-        const content = data.choices[0]?.message?.content || '';
-
-        // Parse JSON from response
-        let analysis;
+        // Parse AI insights
+        let insights;
         try {
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                analysis = JSON.parse(jsonMatch[0]);
+                insights = JSON.parse(jsonMatch[0]);
             } else {
-                throw new Error('No JSON found');
+                throw new Error('No JSON');
             }
         } catch (e) {
-            // Fallback analysis
-            analysis = {
-                channelName: channelName,
-                subscribers: '500K',
-                avgViews: '100K',
-                uploadFrequency: '3 videos/week',
-                topPerforming: [
-                    { title: 'Their most viral video example', views: '2.5M', why: 'Tapped into trending topic with unique angle' },
-                    { title: 'Educational content example', views: '800K', why: 'Provided immense value in first 30 seconds' },
-                    { title: 'Controversial take example', views: '1.2M', why: 'Bold opinion sparked debate in comments' }
-                ],
-                contentPattern: 'Consistent format with strong hooks and clear value proposition',
-                audience: 'Primarily 18-34, interested in self-improvement and learning',
-                opportunities: [
-                    'Create more beginner-friendly content',
-                    'Cover topics they haven\'t touched yet',
-                    'Different content format (Shorts, podcasts)'
-                ],
-                lessonsToLearn: [
-                    'Their thumbnail style drives clicks',
-                    'First 5 seconds always have a hook',
-                    'Consistent upload schedule builds audience'
-                ]
+            insights = {
+                contentPattern: 'Consistent upload schedule with focus on trending topics',
+                audience: 'Primarily 18-34 year olds interested in this niche',
+                opportunities: ['Create more beginner content', 'Cover underserved subtopics', 'Try different formats'],
+                lessonsToLearn: ['Consistency is key', 'Strong thumbnails matter', 'Engage with comments']
             };
         }
+
+        // Build final analysis
+        const analysis = {
+            channelName: channelData?.name || channelName,
+            channelId: channelData?.id || null,
+            thumbnail: channelData?.thumbnail || null,
+            subscribers: channelData?.subscribers || 'Unknown',
+            totalViews: channelData?.totalViews || 'Unknown',
+            videoCount: channelData?.videoCount || 'Unknown',
+            uploadFrequency: channelData ? estimateUploadFrequency(channelData.videoCount) : 'Unknown',
+            isRealData: !!channelData,
+            topPerforming: videos.length > 0
+                ? videos.slice(0, 3).map(v => ({
+                    title: v.title,
+                    views: v.views,
+                    why: `${v.likes} likes, ${v.comments} comments`
+                }))
+                : [
+                    { title: 'Unable to fetch real videos', views: 'N/A', why: 'YouTube API key not configured or channel not found' }
+                ],
+            ...insights
+        };
 
         return {
             statusCode: 200,
@@ -123,4 +216,25 @@ Be specific and actionable. Return ONLY valid JSON.`
             body: JSON.stringify({ error: error.message || 'Failed to analyze competitor' })
         };
     }
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+}
+
+function estimateUploadFrequency(videoCount) {
+    // Rough estimate assuming channel has been active for ~2 years
+    const weeksActive = 104;
+    const videosPerWeek = videoCount / weeksActive;
+
+    if (videosPerWeek >= 7) return 'Daily';
+    if (videosPerWeek >= 3) return '3-5 videos/week';
+    if (videosPerWeek >= 1) return '1-2 videos/week';
+    if (videosPerWeek >= 0.25) return '1-4 videos/month';
+    return 'Occasional';
 }

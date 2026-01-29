@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import { Video, Search, TrendingUp, Lightbulb, Target, Sparkles, ExternalLink, ThumbsUp, MessageSquare, Eye, CheckCircle, Send, BookOpen, Zap, FileText, Copy, Check } from 'lucide-react';
-
-interface TranscriptLine {
-    timestamp: string;
-    text: string;
-    startMs: number;
-}
+import { Video, Search, TrendingUp, Lightbulb, Target, Sparkles, ThumbsUp, Eye, CheckCircle, Send, BookOpen, ListOrdered, MessageSquare, Copy, Check, Clapperboard } from 'lucide-react';
 
 interface VideoInfo {
     id: string;
@@ -16,6 +10,7 @@ interface VideoInfo {
     likes: string;
     comments: string;
     publishedAt: string;
+    description?: string;
 }
 
 interface Analysis {
@@ -27,6 +22,10 @@ interface Analysis {
     lessonsForCreators: string[];
     keyMoments: string[];
     audienceInsight: string;
+    recreationSteps: string[];
+    estimatedBudget: string;
+    difficulty: string;
+    equipmentNeeded: string[];
 }
 
 export default function VideoAnalyzer() {
@@ -34,14 +33,10 @@ export default function VideoAnalyzer() {
     const [loading, setLoading] = useState(false);
     const [video, setVideo] = useState<VideoInfo | null>(null);
     const [analysis, setAnalysis] = useState<Analysis | null>(null);
-    const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
-    const [transcriptText, setTranscriptText] = useState('');
-    const [hasTranscript, setHasTranscript] = useState(false);
     const [error, setError] = useState('');
     const [question, setQuestion] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
     const [chatHistory, setChatHistory] = useState<Array<{ role: string, content: string }>>([]);
-    const [showFullTranscript, setShowFullTranscript] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const handleAnalyze = async (e: React.FormEvent) => {
@@ -52,9 +47,6 @@ export default function VideoAnalyzer() {
         setError('');
         setVideo(null);
         setAnalysis(null);
-        setTranscript(null);
-        setTranscriptText('');
-        setHasTranscript(false);
         setChatHistory([]);
 
         try {
@@ -72,9 +64,6 @@ export default function VideoAnalyzer() {
 
             setVideo(data.video);
             setAnalysis(data.analysis);
-            setTranscript(data.transcript);
-            setTranscriptText(data.transcriptText || '');
-            setHasTranscript(data.hasTranscript);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to analyze video');
         } finally {
@@ -91,16 +80,22 @@ export default function VideoAnalyzer() {
         setChatLoading(true);
 
         try {
-            const response = await fetch('/api/analyze-video', {
+            const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ videoUrl: url, question: userQuestion })
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: `You are analyzing the video "${video.title}" by ${video.channel}. It has ${video.views} views. Help the user understand this video and how to recreate similar content.` },
+                        ...chatHistory.map(m => ({ role: m.role, content: m.content })),
+                        { role: 'user', content: userQuestion }
+                    ]
+                })
             });
 
             const data = await response.json();
 
-            if (data.chatResponse) {
-                setChatHistory(prev => [...prev, { role: 'assistant', content: data.chatResponse }]);
+            if (data.message) {
+                setChatHistory(prev => [...prev, { role: 'assistant', content: data.message }]);
             }
         } catch (err) {
             setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not answer that question.' }]);
@@ -109,8 +104,10 @@ export default function VideoAnalyzer() {
         }
     };
 
-    const copyTranscript = () => {
-        navigator.clipboard.writeText(transcriptText);
+    const copyRecreationSteps = () => {
+        if (!analysis?.recreationSteps) return;
+        const text = analysis.recreationSteps.map((step, i) => `${i + 1}. ${step}`).join('\n');
+        navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -121,6 +118,12 @@ export default function VideoAnalyzer() {
         return 'var(--error)';
     };
 
+    const getDifficultyColor = (diff: string) => {
+        if (diff?.toLowerCase().includes('easy')) return 'var(--success)';
+        if (diff?.toLowerCase().includes('medium')) return 'var(--warning)';
+        return 'var(--error)';
+    };
+
     return (
         <div className="animate-fadeIn">
             <div className="page-header">
@@ -128,17 +131,17 @@ export default function VideoAnalyzer() {
                     <Video size={32} style={{ color: 'var(--accent-youtube)' }} />
                     Video Analyzer
                 </h1>
-                <p>Get the FULL transcript + AI analysis of any YouTube video</p>
+                <p>Analyze any YouTube video and get step-by-step recreation guide</p>
             </div>
 
             {/* Search */}
             <form onSubmit={handleAnalyze} className="card mb-6">
-                <div className="flex gap-3">
-                    <div className="form-group flex-1" style={{ marginBottom: 0 }}>
+                <div className="flex gap-3 flex-wrap">
+                    <div className="form-group flex-1" style={{ marginBottom: 0, minWidth: '200px' }}>
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Paste any YouTube URL (watch, shorts, youtu.be)"
+                            placeholder="Paste any YouTube URL..."
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                         />
@@ -153,23 +156,21 @@ export default function VideoAnalyzer() {
                 </div>
             </form>
 
-            {error && (
-                <div className="alert alert-error mb-4">{error}</div>
-            )}
+            {error && <div className="alert alert-error mb-4">{error}</div>}
 
             {loading && (
                 <div className="card">
                     <div className="loading-overlay" style={{ minHeight: '300px' }}>
                         <div className="loading-spinner"></div>
-                        <p>Fetching transcript and analyzing...</p>
+                        <p>Analyzing video content and creating recreation guide...</p>
                     </div>
                 </div>
             )}
 
             {video && !loading && (
                 <div className="animate-slideUp space-y-6">
-                    {/* Top Row: Video + Stats */}
-                    <div className="grid grid-cols-4 gap-6">
+                    {/* Top Row: Video + Stats + Score */}
+                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                             <img
                                 src={video.thumbnail}
@@ -177,7 +178,7 @@ export default function VideoAnalyzer() {
                                 style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover' }}
                             />
                             <div style={{ padding: '1rem' }}>
-                                <h3 style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                                <h3 style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem', lineHeight: 1.3 }}>
                                     {video.title}
                                 </h3>
                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
@@ -186,24 +187,18 @@ export default function VideoAnalyzer() {
                             </div>
                         </div>
 
-                        {/* Stats */}
-                        <div className="card flex flex-col justify-center">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Eye size={20} style={{ color: 'var(--accent-primary)' }} />
-                                <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.views}</span>
-                            </div>
+                        <div className="card flex flex-col justify-center items-center">
+                            <Eye size={24} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
+                            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.views}</span>
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Views</span>
                         </div>
 
-                        <div className="card flex flex-col justify-center">
-                            <div className="flex items-center gap-2 mb-2">
-                                <ThumbsUp size={20} style={{ color: 'var(--success)' }} />
-                                <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.likes}</span>
-                            </div>
+                        <div className="card flex flex-col justify-center items-center">
+                            <ThumbsUp size={24} style={{ color: 'var(--success)', marginBottom: '0.5rem' }} />
+                            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.likes}</span>
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Likes</span>
                         </div>
 
-                        {/* Viral Score */}
                         {analysis && (
                             <div className="card flex flex-col justify-center items-center">
                                 <div style={{
@@ -225,165 +220,224 @@ export default function VideoAnalyzer() {
                         )}
                     </div>
 
-                    {/* FULL TRANSCRIPT */}
-                    <div className="card">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="card-title flex items-center gap-2">
-                                <FileText size={20} style={{ color: 'var(--accent-primary)' }} />
-                                Full Transcript
-                                {hasTranscript && (
-                                    <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'var(--success)', color: '#000', borderRadius: '1rem' }}>
-                                        ✓ Real Data
-                                    </span>
-                                )}
-                            </h3>
-                            <div className="flex gap-2">
-                                {hasTranscript && (
-                                    <button onClick={copyTranscript} className="btn btn-secondary btn-sm">
-                                        {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy All</>}
-                                    </button>
-                                )}
-                                {transcript && transcript.length > 10 && (
-                                    <button
-                                        onClick={() => setShowFullTranscript(!showFullTranscript)}
-                                        className="btn btn-secondary btn-sm"
-                                    >
-                                        {showFullTranscript ? 'Show Less' : `Show All (${transcript.length} lines)`}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {!hasTranscript ? (
-                            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                <p>No transcript available for this video.</p>
-                                <p style={{ fontSize: '0.85rem' }}>The video may not have captions enabled.</p>
-                            </div>
-                        ) : (
-                            <div style={{
-                                maxHeight: showFullTranscript ? 'none' : '400px',
-                                overflowY: 'auto',
-                                background: 'var(--bg-tertiary)',
-                                borderRadius: '0.5rem',
-                                padding: '1rem'
-                            }}>
-                                {transcript?.slice(0, showFullTranscript ? undefined : 20).map((line, i) => (
-                                    <div key={i} className="flex gap-3" style={{ marginBottom: '0.5rem' }}>
-                                        <span style={{
-                                            color: 'var(--accent-primary)',
-                                            fontFamily: 'monospace',
-                                            fontSize: '0.8rem',
-                                            minWidth: '50px'
-                                        }}>
-                                            {line.timestamp}
-                                        </span>
-                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                            {line.text}
-                                        </span>
+                    {/* Main Content Grid */}
+                    <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                        {/* Left Column: Recreation Guide */}
+                        <div className="space-y-4">
+                            {/* Step-by-Step Recreation */}
+                            {analysis?.recreationSteps && (
+                                <div className="card">
+                                    <div className="card-header" style={{ marginBottom: '1rem' }}>
+                                        <h3 className="card-title flex items-center gap-2">
+                                            <ListOrdered size={20} style={{ color: 'var(--accent-primary)' }} />
+                                            How to Recreate This Video
+                                        </h3>
+                                        <button onClick={copyRecreationSteps} className="btn btn-secondary btn-sm">
+                                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                                        </button>
                                     </div>
-                                ))}
-                                {!showFullTranscript && transcript && transcript.length > 20 && (
-                                    <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>
-                                        ... {transcript.length - 20} more lines
+
+                                    <div className="space-y-3">
+                                        {analysis.recreationSteps.map((step, i) => (
+                                            <div key={i} className="flex gap-3" style={{
+                                                padding: '0.75rem',
+                                                background: 'var(--bg-tertiary)',
+                                                borderRadius: '0.5rem',
+                                                borderLeft: '3px solid var(--accent-primary)'
+                                            }}>
+                                                <span style={{
+                                                    background: 'var(--accent-primary)',
+                                                    color: 'white',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    flexShrink: 0
+                                                }}>
+                                                    {i + 1}
+                                                </span>
+                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{step}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-6">
-                        {/* AI Chat */}
-                        <div className="card">
-                            <h3 className="card-title flex items-center gap-2 mb-3">
-                                <Sparkles size={18} style={{ color: 'var(--accent-primary)' }} />
-                                Ask AI About This Video
-                            </h3>
-
-                            {chatHistory.length > 0 && (
-                                <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1rem' }} className="space-y-2">
-                                    {chatHistory.map((msg, i) => (
-                                        <div key={i} style={{
-                                            padding: '0.5rem 0.75rem',
-                                            borderRadius: '0.5rem',
-                                            background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                                            fontSize: '0.85rem'
-                                        }}>
-                                            {msg.content}
+                                    {/* Quick Stats */}
+                                    <div className="grid grid-cols-3 gap-2 mt-4">
+                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Difficulty</p>
+                                            <p style={{ fontWeight: 600, color: getDifficultyColor(analysis.difficulty) }}>{analysis.difficulty}</p>
                                         </div>
-                                    ))}
-                                    {chatLoading && (
-                                        <div style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>
-                                            Thinking...
+                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Est. Budget</p>
+                                            <p style={{ fontWeight: 600 }}>{analysis.estimatedBudget}</p>
                                         </div>
-                                    )}
+                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Equipment</p>
+                                            <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>{analysis.equipmentNeeded?.length || 0} items</p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Ask anything..."
-                                    value={question}
-                                    onChange={(e) => setQuestion(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
-                                    style={{ fontSize: '0.85rem' }}
-                                />
-                                <button onClick={askQuestion} className="btn btn-primary btn-sm" disabled={chatLoading}>
-                                    <Send size={16} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Analysis */}
-                        {analysis && (
-                            <>
+                            {/* Equipment Needed */}
+                            {analysis?.equipmentNeeded && (
                                 <div className="card">
                                     <h3 className="card-title flex items-center gap-2 mb-3">
-                                        <Target size={18} style={{ color: 'var(--accent-youtube)' }} />
-                                        Hook Analysis
+                                        <Clapperboard size={18} style={{ color: 'var(--warning)' }} />
+                                        Equipment Needed
                                     </h3>
-                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{analysis.hookAnalysis}</p>
-                                </div>
-
-                                <div className="card">
-                                    <h3 className="card-title flex items-center gap-2 mb-3">
-                                        <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                                        Why It Works
-                                    </h3>
-                                    <div className="space-y-1">
-                                        {analysis.whyItWorks?.slice(0, 3).map((reason, i) => (
-                                            <p key={i} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                ✓ {reason}
-                                            </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {analysis.equipmentNeeded.map((item, i) => (
+                                            <span key={i} className="badge badge-primary">{item}</span>
                                         ))}
                                     </div>
                                 </div>
-                            </>
-                        )}
-                    </div>
+                            )}
 
-                    {/* Lessons */}
-                    {analysis?.lessonsForCreators && (
-                        <div className="card">
-                            <h3 className="card-title flex items-center gap-2 mb-4">
-                                <Lightbulb size={20} style={{ color: 'var(--warning)' }} />
-                                Lessons to Apply
-                            </h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                {analysis.lessonsForCreators.map((lesson, i) => (
-                                    <div key={i} style={{
-                                        padding: '0.75rem',
-                                        background: 'var(--bg-tertiary)',
-                                        borderRadius: '0.5rem',
-                                        fontSize: '0.9rem'
-                                    }}>
-                                        💡 {lesson}
-                                    </div>
-                                ))}
+                            {/* AI Chat */}
+                            <div className="card">
+                                <h3 className="card-title flex items-center gap-2 mb-3">
+                                    <MessageSquare size={18} style={{ color: 'var(--accent-primary)' }} />
+                                    Ask About This Video
+                                </h3>
+
+                                <div style={{
+                                    minHeight: '150px',
+                                    maxHeight: '250px',
+                                    overflowY: 'auto',
+                                    marginBottom: '1rem',
+                                    padding: '0.5rem',
+                                    background: 'var(--bg-tertiary)',
+                                    borderRadius: '0.5rem'
+                                }}>
+                                    {chatHistory.length === 0 ? (
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
+                                            Ask anything!
+                                            <br /><br />
+                                            • "What editing software did they use?"
+                                            <br />• "How can I make my version unique?"
+                                            <br />• "What's the filming technique?"
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {chatHistory.map((msg, i) => (
+                                                <div key={i} style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: '0.5rem',
+                                                    background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                                                    fontSize: '0.85rem'
+                                                }}>
+                                                    {msg.content}
+                                                </div>
+                                            ))}
+                                            {chatLoading && (
+                                                <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                    Thinking...
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Ask anything..."
+                                        value={question}
+                                        onChange={(e) => setQuestion(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
+                                        style={{ fontSize: '0.85rem' }}
+                                    />
+                                    <button onClick={askQuestion} className="btn btn-primary btn-sm" disabled={chatLoading}>
+                                        <Send size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    )}
+
+                        {/* Right Column: Analysis */}
+                        <div className="space-y-4">
+                            {analysis && (
+                                <>
+                                    {/* Hook Analysis */}
+                                    <div className="card">
+                                        <h3 className="card-title flex items-center gap-2 mb-3">
+                                            <Target size={18} style={{ color: 'var(--accent-youtube)' }} />
+                                            Hook Analysis
+                                        </h3>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{analysis.hookAnalysis}</p>
+                                    </div>
+
+                                    {/* Why It Works */}
+                                    <div className="card">
+                                        <h3 className="card-title flex items-center gap-2 mb-3">
+                                            <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                                            Why It Works
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {analysis.whyItWorks?.map((reason, i) => (
+                                                <div key={i} style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    background: 'var(--bg-tertiary)',
+                                                    borderRadius: '0.5rem',
+                                                    fontSize: '0.9rem',
+                                                    borderLeft: '3px solid var(--success)'
+                                                }}>
+                                                    ✓ {reason}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Viral Formulas Used */}
+                                    <div className="card">
+                                        <h3 className="card-title flex items-center gap-2 mb-3">
+                                            <TrendingUp size={18} style={{ color: 'var(--accent-primary)' }} />
+                                            Viral Formulas Used
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysis.viralFormulas?.map((formula, i) => (
+                                                <span key={i} style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                                                    borderRadius: '1rem',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 500
+                                                }}>
+                                                    {formula}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Lessons */}
+                                    <div className="card">
+                                        <h3 className="card-title flex items-center gap-2 mb-3">
+                                            <Lightbulb size={18} style={{ color: 'var(--warning)' }} />
+                                            Key Lessons
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {analysis.lessonsForCreators?.map((lesson, i) => (
+                                                <div key={i} style={{
+                                                    padding: '0.5rem 0.75rem',
+                                                    background: 'var(--bg-tertiary)',
+                                                    borderRadius: '0.5rem',
+                                                    fontSize: '0.9rem'
+                                                }}>
+                                                    💡 {lesson}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

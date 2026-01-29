@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Music, TrendingUp, Zap, Lightbulb, Target, Send, Sparkles, Volume2, Film, MessageSquare } from 'lucide-react';
+import { Music, TrendingUp, Zap, Lightbulb, Target, Send, Volume2, Film, MessageSquare } from 'lucide-react';
 
 interface Sound {
     name: string;

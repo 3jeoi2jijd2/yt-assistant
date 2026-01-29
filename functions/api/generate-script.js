@@ -52,7 +52,8 @@ ALGORITHM INSIGHTS:
 - Shares/Saves matter more than likes
 - Series content gets algorithmic boost
 
-Your scripts feel REAL, not scripted.`;
+Your scripts feel REAL, not scripted.
+DO NOT use asterisks (*) or markdown formatting. Use CAPS for headers/emphasis.`;
 
         const userPrompt = `Create a VIRAL ${platformName} script for the "${niche}" niche${topic ? ` about "${topic}"` : ''}.
 
@@ -60,16 +61,18 @@ PLATFORM: ${platformName}
 LENGTH: ${length.words} words (${length.duration})
 
 FORMAT:
-**🎬 TITLE OPTIONS**
+TITLE OPTIONS
 (3 click-worthy, SEO-optimized titles)
 
-**🎯 THE HOOK** (First 3 seconds)
+THE HOOK (First 3 seconds)
 
-**📜 FULL SCRIPT**
+FULL SCRIPT
 (Include [VISUAL] cues, timestamps, pattern interrupts)
 
-**✨ PRO TIPS**
-(Platform-specific advice for this script)`;
+PRO TIPS
+(Platform-specific advice for this script)
+
+REMEMBER: No asterisks.`;
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -94,8 +97,12 @@ FORMAT:
             throw new Error(data.error?.message || 'API request failed');
         }
 
+        let scriptContent = data.choices[0]?.message?.content || 'Failed to generate script.';
+        // Remove asterisks
+        scriptContent = scriptContent.replace(/\*/g, '');
+
         return new Response(JSON.stringify({
-            script: data.choices[0]?.message?.content || 'Failed to generate script.'
+            script: scriptContent
         }), { headers: corsHeaders });
 
     } catch (error) {

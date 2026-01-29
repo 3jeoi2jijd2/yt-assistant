@@ -17,7 +17,8 @@ import {
     AlignLeft,
     Calendar,
     Radar,
-    Eye
+    Eye,
+    Video
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -37,6 +38,7 @@ import DescriptionWriter from './pages/DescriptionWriter';
 import ContentCalendar from './pages/ContentCalendar';
 import TrendRadar from './pages/TrendRadar';
 import CompetitorSpy from './pages/CompetitorSpy';
+import VideoAnalyzer from './pages/VideoAnalyzer';
 
 import './index.css';
 
@@ -101,6 +103,10 @@ function Sidebar() {
                         <NavLink to="/competitor-spy" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                             <Eye size={20} />
                             Competitor Spy
+                        </NavLink>
+                        <NavLink to="/video-analyzer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Video size={20} />
+                            Video Analyzer
                         </NavLink>
                     </div>
 
@@ -180,6 +186,7 @@ function AppContent() {
                     {/* Analyze */}
                     <Route path="/thumbnail-analyzer" element={showApp ? <ThumbnailAnalyzer /> : <Navigate to="/auth" />} />
                     <Route path="/competitor-spy" element={showApp ? <CompetitorSpy /> : <Navigate to="/auth" />} />
+                    <Route path="/video-analyzer" element={showApp ? <VideoAnalyzer /> : <Navigate to="/auth" />} />
 
                     {/* Research */}
                     <Route path="/trend-radar" element={showApp ? <TrendRadar /> : <Navigate to="/auth" />} />

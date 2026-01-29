@@ -1,5 +1,5 @@
-// Transcribe YouTube video using Supadata free API
-// This API works from cloud servers unlike direct YouTube scraping
+// Transcribe YouTube video - using YouTube's internal APIs
+// This mimics how browser-based transcript tools work
 
 export async function handler(event) {
     const headers = {
@@ -29,191 +29,92 @@ export async function handler(event) {
 
         console.log('Fetching transcript for:', videoId);
 
-        // Get video title first
-        let videoTitle = 'YouTube Video';
-        try {
-            const oembedRes = await fetch(
-                `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
-            );
-            if (oembedRes.ok) {
-                const oembed = await oembedRes.json();
-                videoTitle = oembed.title || 'YouTube Video';
-            }
-        } catch (e) {
-            console.log('Could not fetch video title');
+        // Get video info using YouTube's internal player API
+        const playerResponse = await fetch('https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            },
+            body: JSON.stringify({
+                context: {
+                    client: {
+                        hl: 'en',
+                        gl: 'US',
+                        clientName: 'WEB',
+                        clientVersion: '2.20240111.09.00'
+                    }
+                },
+                videoId: videoId
+            })
+        });
+
+        if (!playerResponse.ok) {
+            console.log('Player API failed:', playerResponse.status);
+            throw new Error('Failed to get video info');
         }
 
-        let transcript = null;
+        const playerData = await playerResponse.json();
 
-        // Method 1: Try Supadata API (works from cloud servers)
-        try {
-            const supadataRes = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en`, {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
+        // Get video title
+        const videoTitle = playerData?.videoDetails?.title || 'YouTube Video';
 
-            if (supadataRes.ok) {
-                const data = await supadataRes.json();
-                if (data.content && data.content.length > 0) {
-                    transcript = data.content
-                        .map(item => item.text)
-                        .join(' ')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                }
-            } else {
-                console.log('Supadata returned:', supadataRes.status);
+        // Get caption tracks from player response
+        const captionTracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+        if (!captionTracks || captionTracks.length === 0) {
+            // Try alternative: fetch the video page and extract captions
+            const alternativeTranscript = await tryAlternativeMethod(videoId);
+            if (alternativeTranscript) {
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({
+                        transcript: alternativeTranscript,
+                        title: videoTitle
+                    })
+                };
             }
-        } catch (e) {
-            console.log('Supadata API failed:', e.message);
-        }
 
-        // Method 2: Try RapidAPI YouTube Transcript (free tier available)
-        if (!transcript) {
-            try {
-                const rapidRes = await fetch(`https://youtube-transcriptor.p.rapidapi.com/transcript?video_id=${videoId}&lang=en`, {
-                    headers: {
-                        'X-RapidAPI-Key': 'free-tier',
-                        'X-RapidAPI-Host': 'youtube-transcriptor.p.rapidapi.com'
-                    }
-                });
-
-                if (rapidRes.ok) {
-                    const data = await rapidRes.json();
-                    if (data && Array.isArray(data)) {
-                        transcript = data
-                            .map(item => item.text || item.subtitle)
-                            .filter(Boolean)
-                            .join(' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                    }
-                }
-            } catch (e) {
-                console.log('RapidAPI failed:', e.message);
-            }
-        }
-
-        // Method 3: Try Tactiq's public endpoint
-        if (!transcript) {
-            try {
-                const tactiqRes = await fetch(`https://tactiq-apps-prod.tactiq.io/transcript`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ videoId, langCode: 'en' })
-                });
-
-                if (tactiqRes.ok) {
-                    const data = await tactiqRes.json();
-                    if (data.captions && data.captions.length > 0) {
-                        transcript = data.captions
-                            .map(c => c.text)
-                            .join(' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                    }
-                }
-            } catch (e) {
-                console.log('Tactiq failed:', e.message);
-            }
-        }
-
-        // Method 4: Direct Google timedtext API
-        if (!transcript) {
-            try {
-                const languages = ['en', 'en-US', 'a.en', 'asr'];
-                for (const lang of languages) {
-                    const timedtextUrl = `http://video.google.com/timedtext?lang=${lang}&v=${videoId}`;
-                    const ttRes = await fetch(timedtextUrl);
-
-                    if (ttRes.ok) {
-                        const xml = await ttRes.text();
-                        if (xml && xml.includes('<text')) {
-                            const textMatches = [...xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)];
-                            if (textMatches.length > 0) {
-                                transcript = textMatches
-                                    .map(m => m[1]
-                                        .replace(/&amp;/g, '&')
-                                        .replace(/&lt;/g, '<')
-                                        .replace(/&gt;/g, '>')
-                                        .replace(/&#39;/g, "'")
-                                        .replace(/&quot;/g, '"')
-                                        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)))
-                                    )
-                                    .join(' ')
-                                    .replace(/\s+/g, ' ')
-                                    .trim();
-                                break;
-                            }
-                        }
-                    }
-                }
-            } catch (e) {
-                console.log('Timedtext failed:', e.message);
-            }
-        }
-
-        // Method 5: YouTube's own transcript page scraping
-        if (!transcript) {
-            try {
-                // Try fetching from YouTube's mobile site which is simpler
-                const mobileUrl = `https://m.youtube.com/watch?v=${videoId}`;
-                const mobileRes = await fetch(mobileUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-                        'Accept-Language': 'en-US,en;q=0.9'
-                    }
-                });
-
-                if (mobileRes.ok) {
-                    const html = await mobileRes.text();
-
-                    // Look for caption tracks in player response
-                    const captionMatch = html.match(/"captionTracks":\s*\[(.*?)\]/);
-                    if (captionMatch) {
-                        try {
-                            const tracks = JSON.parse('[' + captionMatch[1] + ']');
-                            const enTrack = tracks.find(t => t.languageCode?.startsWith('en')) || tracks[0];
-
-                            if (enTrack?.baseUrl) {
-                                const captionRes = await fetch(enTrack.baseUrl);
-                                if (captionRes.ok) {
-                                    const captionXml = await captionRes.text();
-                                    const textMatches = [...captionXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)];
-                                    if (textMatches.length > 0) {
-                                        transcript = textMatches
-                                            .map(m => m[1]
-                                                .replace(/&amp;/g, '&')
-                                                .replace(/&#39;/g, "'")
-                                                .replace(/&quot;/g, '"')
-                                            )
-                                            .join(' ')
-                                            .replace(/\s+/g, ' ')
-                                            .trim();
-                                    }
-                                }
-                            }
-                        } catch (parseErr) {
-                            console.log('Caption parse failed');
-                        }
-                    }
-                }
-            } catch (e) {
-                console.log('Mobile scraping failed:', e.message);
-            }
-        }
-
-        if (!transcript) {
             return {
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({
-                    error: 'Could not fetch transcript from any source. The video may not have captions, or all transcript services are currently unavailable.'
+                    error: 'This video does not have captions available.'
                 })
             };
+        }
+
+        // Find the best caption track (prefer English)
+        let captionTrack = captionTracks.find(t =>
+            t.languageCode === 'en' ||
+            t.languageCode?.startsWith('en')
+        );
+
+        // If no English, use first available
+        if (!captionTrack) {
+            captionTrack = captionTracks[0];
+        }
+
+        console.log('Found caption track:', captionTrack.languageCode);
+
+        // Fetch the actual captions
+        const captionUrl = captionTrack.baseUrl;
+        const captionResponse = await fetch(captionUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        if (!captionResponse.ok) {
+            throw new Error('Failed to fetch caption content');
+        }
+
+        const captionXml = await captionResponse.text();
+        const transcript = parseXmlCaptions(captionXml);
+
+        if (!transcript) {
+            throw new Error('Failed to parse captions');
         }
 
         return {
@@ -221,7 +122,8 @@ export async function handler(event) {
             headers,
             body: JSON.stringify({
                 transcript,
-                title: videoTitle
+                title: videoTitle,
+                language: captionTrack.languageCode
             })
         };
 
@@ -232,5 +134,101 @@ export async function handler(event) {
             headers,
             body: JSON.stringify({ error: 'Failed to fetch transcript: ' + error.message })
         };
+    }
+}
+
+async function tryAlternativeMethod(videoId) {
+    try {
+        // Try fetching with Android client which sometimes has better access
+        const androidResponse = await fetch('https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip'
+            },
+            body: JSON.stringify({
+                context: {
+                    client: {
+                        hl: 'en',
+                        gl: 'US',
+                        clientName: 'ANDROID',
+                        clientVersion: '17.36.4',
+                        androidSdkVersion: 31
+                    }
+                },
+                videoId: videoId
+            })
+        });
+
+        if (!androidResponse.ok) {
+            return null;
+        }
+
+        const data = await androidResponse.json();
+        const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+        if (!tracks || tracks.length === 0) {
+            return null;
+        }
+
+        const track = tracks.find(t => t.languageCode?.startsWith('en')) || tracks[0];
+
+        if (!track?.baseUrl) {
+            return null;
+        }
+
+        const captionRes = await fetch(track.baseUrl);
+        if (!captionRes.ok) {
+            return null;
+        }
+
+        const xml = await captionRes.text();
+        return parseXmlCaptions(xml);
+
+    } catch (e) {
+        console.log('Alternative method failed:', e.message);
+        return null;
+    }
+}
+
+function parseXmlCaptions(xml) {
+    try {
+        const textMatches = [...xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)];
+
+        if (textMatches.length === 0) {
+            // Try JSON format (some captions come as JSON)
+            try {
+                const json = JSON.parse(xml);
+                if (json.events) {
+                    return json.events
+                        .filter(e => e.segs)
+                        .map(e => e.segs.map(s => s.utf8 || '').join(''))
+                        .join(' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                }
+            } catch (e) {
+                // Not JSON, continue with XML parsing
+            }
+            return null;
+        }
+
+        const texts = textMatches.map(match => {
+            let text = match[1];
+            return text
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"')
+                .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)))
+                .replace(/\n/g, ' ')
+                .trim();
+        });
+
+        return texts.join(' ').replace(/\s+/g, ' ').trim();
+    } catch (e) {
+        console.error('Parse error:', e.message);
+        return null;
     }
 }

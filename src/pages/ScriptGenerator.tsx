@@ -43,6 +43,7 @@ export default function ScriptGenerator() {
 
     const startChat = async () => {
         setChatLoading(true);
+        setError('');
         try {
             const response = await fetch('/.netlify/functions/ai-chat', {
                 method: 'POST',
@@ -53,7 +54,21 @@ export default function ScriptGenerator() {
                 })
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error('Failed to parse response:', text);
+                setError('API returned invalid response. Please try again.');
+                return;
+            }
+
+            if (data.error) {
+                setError(data.error);
+                return;
+            }
+
             if (data.reply) {
                 setMessages([
                     { role: 'user', content: 'Hi! I want to create a viral video script.' },
@@ -62,16 +77,19 @@ export default function ScriptGenerator() {
             }
         } catch (err) {
             console.error('Failed to start chat:', err);
+            setError('Failed to connect to AI. Please try again.');
         } finally {
             setChatLoading(false);
         }
     };
+
 
     const sendMessage = async () => {
         if (!input.trim() || chatLoading) return;
 
         const userMessage = input.trim();
         setInput('');
+        setError('');
 
         const newMessages = [...messages, { role: 'user' as const, content: userMessage }];
         setMessages(newMessages);
@@ -87,7 +105,21 @@ export default function ScriptGenerator() {
                 })
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error('Failed to parse response:', text);
+                setError('API returned invalid response. Please try again.');
+                return;
+            }
+
+            if (data.error) {
+                setError(data.error);
+                return;
+            }
+
             if (data.reply) {
                 setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
 
@@ -98,10 +130,12 @@ export default function ScriptGenerator() {
             }
         } catch (err) {
             console.error('Failed to send message:', err);
+            setError('Failed to send message. Please try again.');
         } finally {
             setChatLoading(false);
         }
     };
+
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {

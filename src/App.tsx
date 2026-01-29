@@ -21,7 +21,8 @@ import {
     Video,
     Music,
     Settings as SettingsIcon,
-    User
+    User,
+    ScrollText
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -32,6 +33,7 @@ import NicheFinder from './pages/NicheFinder';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
 import SettingsPage from './pages/Settings';
+import Transcriber from './pages/Transcriber';
 
 // Tool Pages
 import ThumbnailAnalyzer from './pages/ThumbnailAnalyzer';
@@ -121,6 +123,10 @@ function Sidebar() {
 
                     <div className="nav-section">
                         <span className="nav-section-title">Analyze</span>
+                        <NavLink to="/transcriber" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <ScrollText size={20} />
+                            Transcriber
+                        </NavLink>
                         <NavLink to="/thumbnail-analyzer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                             <Image size={20} />
                             Thumbnail Analyzer
@@ -218,6 +224,7 @@ function AppContent() {
                     <Route path="/hashtag-generator" element={showApp ? <HashtagGenerator /> : <Navigate to="/auth" />} />
 
                     {/* Analyze */}
+                    <Route path="/transcriber" element={showApp ? <Transcriber /> : <Navigate to="/auth" />} />
                     <Route path="/thumbnail-analyzer" element={showApp ? <ThumbnailAnalyzer /> : <Navigate to="/auth" />} />
                     <Route path="/competitor-spy" element={showApp ? <CompetitorSpy /> : <Navigate to="/auth" />} />
                     <Route path="/video-analyzer" element={showApp ? <VideoAnalyzer /> : <Navigate to="/auth" />} />

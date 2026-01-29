@@ -18,7 +18,8 @@ import {
     Calendar,
     Radar,
     Eye,
-    Video
+    Video,
+    Music
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -39,6 +40,7 @@ import ContentCalendar from './pages/ContentCalendar';
 import TrendRadar from './pages/TrendRadar';
 import CompetitorSpy from './pages/CompetitorSpy';
 import VideoAnalyzer from './pages/VideoAnalyzer';
+import TikTokAnalyzer from './pages/TikTokAnalyzer';
 
 import './index.css';
 
@@ -124,6 +126,10 @@ function Sidebar() {
                             <Search size={20} />
                             Channel Finder
                         </NavLink>
+                        <NavLink to="/tiktok-analyzer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Music size={20} />
+                            TikTok Analyzer
+                        </NavLink>
                     </div>
 
                     <div className="nav-section">
@@ -192,6 +198,7 @@ function AppContent() {
                     <Route path="/trend-radar" element={showApp ? <TrendRadar /> : <Navigate to="/auth" />} />
                     <Route path="/niche-finder" element={showApp ? <NicheFinder /> : <Navigate to="/auth" />} />
                     <Route path="/channel-finder" element={showApp ? <ChannelFinder /> : <Navigate to="/auth" />} />
+                    <Route path="/tiktok-analyzer" element={showApp ? <TikTokAnalyzer /> : <Navigate to="/auth" />} />
 
                     {/* Plan */}
                     <Route path="/content-calendar" element={showApp ? <ContentCalendar /> : <Navigate to="/auth" />} />

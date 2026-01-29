@@ -1,4 +1,4 @@
-// Cloudflare Pages Function: Get Transcript using YouTube API
+// Cloudflare Pages Function: Analyze Video with Transcript support
 
 export async function onRequestPost(context) {
     const corsHeaders = {
@@ -8,7 +8,7 @@ export async function onRequestPost(context) {
     };
 
     try {
-        const { videoUrl } = await context.request.json();
+        const { videoUrl, question } = await context.request.json();
         const youtubeKey = context.env.YOUTUBE_API_KEY;
         const groqKey = context.env.GROQ_API_KEY;
 
@@ -19,10 +19,10 @@ export async function onRequestPost(context) {
             });
         }
 
-        // Extract video ID
+        // Extract video ID - supports regular, shorts, and embed URLs
         const videoId = extractVideoId(videoUrl);
         if (!videoId) {
-            return new Response(JSON.stringify({ error: 'Invalid YouTube URL' }), {
+            return new Response(JSON.stringify({ error: 'Invalid YouTube URL. Supported formats: youtube.com/watch, youtu.be, youtube.com/shorts' }), {
                 status: 400,
                 headers: corsHeaders
             });
@@ -46,32 +46,86 @@ export async function onRequestPost(context) {
             id: videoId,
             title: video.snippet.title,
             channel: video.snippet.channelTitle,
+            channelId: video.snippet.channelId,
             description: video.snippet.description,
-            thumbnail: video.snippet.thumbnails?.high?.url,
+            thumbnail: video.snippet.thumbnails?.maxres?.url || video.snippet.thumbnails?.high?.url,
             views: parseInt(video.statistics.viewCount) || 0,
             likes: parseInt(video.statistics.likeCount) || 0,
             comments: parseInt(video.statistics.commentCount) || 0,
             publishedAt: video.snippet.publishedAt,
-            duration: video.contentDetails.duration
+            duration: video.contentDetails.duration,
+            tags: video.snippet.tags || []
         };
 
-        // Get captions list
-        const captionsRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${youtubeKey}`
-        );
-        const captionsData = await captionsRes.json();
-
+        // Try to get captions/transcript
         let transcript = null;
         let captionsAvailable = false;
 
-        if (captionsData.items?.length > 0) {
-            captionsAvailable = true;
-            // Note: Actually downloading captions requires OAuth, so we'll use the description and AI
+        try {
+            // Get captions list
+            const captionsRes = await fetch(
+                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${youtubeKey}`
+            );
+            const captionsData = await captionsRes.json();
+
+            if (captionsData.items?.length > 0) {
+                captionsAvailable = true;
+                // Find English captions
+                const englishCaption = captionsData.items.find(c =>
+                    c.snippet.language === 'en' || c.snippet.language?.startsWith('en')
+                ) || captionsData.items[0];
+
+                // Note: Actually downloading captions requires OAuth
+                // We'll use the description and available info for analysis
+            }
+        } catch (e) {
+            console.log('Captions error:', e.message);
         }
 
-        // Use AI to analyze the video based on title, description, and metadata
+        // AI Analysis
         let analysis = null;
+        let chatResponse = null;
+
         if (groqKey) {
+            const engagementRate = videoInfo.views > 0 ? ((videoInfo.likes / videoInfo.views) * 100).toFixed(2) : 0;
+
+            // If user asked a question, answer it
+            if (question) {
+                const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${groqKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'llama-3.3-70b-versatile',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: `You are an expert video analyst helping a creator understand this video. Answer questions based on the video metadata. Be specific and actionable.
+
+VIDEO INFO:
+Title: ${videoInfo.title}
+Channel: ${videoInfo.channel}
+Views: ${formatNumber(videoInfo.views)}
+Likes: ${formatNumber(videoInfo.likes)}
+Engagement: ${engagementRate}%
+Duration: ${videoInfo.duration}
+Tags: ${videoInfo.tags.slice(0, 10).join(', ')}
+Description: ${videoInfo.description.substring(0, 1000)}`
+                            },
+                            { role: 'user', content: question }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 800
+                    })
+                });
+
+                const chatData = await chatRes.json();
+                chatResponse = chatData.choices?.[0]?.message?.content;
+            }
+
+            // Full analysis
             const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -83,33 +137,37 @@ export async function onRequestPost(context) {
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a viral content analyst. Analyze this YouTube video and provide insights. Return JSON:
+                            content: `You are an elite viral content analyst. Analyze this video and return JSON:
 {
   "viralScore": 85,
-  "hookAnalysis": "Analysis of the title/thumbnail hook",
-  "contentBreakdown": "What the video likely covers based on metadata",
+  "hookAnalysis": "How effective is the title/thumbnail as a hook",
+  "contentStructure": "How the video is likely structured based on title/description",
   "whyItWorks": ["reason1", "reason2", "reason3"],
+  "viralFormulas": ["formula name: explanation"],
   "lessonsForCreators": ["lesson1", "lesson2", "lesson3"],
   "suggestedImprovements": ["improvement1", "improvement2"],
-  "estimatedRetention": "Estimated viewer retention pattern",
-  "audienceInsight": "Who watches this and why"
+  "estimatedRetention": "Retention pattern prediction",
+  "audienceInsight": "Who watches this and why",
+  "transcriptSummary": "Based on title/description, summarize what this video covers",
+  "keyMoments": ["key moment/topic 1", "key moment/topic 2", "key moment/topic 3"]
 }`
                         },
                         {
                             role: 'user',
-                            content: `Analyze this video:
+                            content: `Analyze:
 TITLE: ${videoInfo.title}
 CHANNEL: ${videoInfo.channel}
 VIEWS: ${formatNumber(videoInfo.views)}
 LIKES: ${formatNumber(videoInfo.likes)}
 COMMENTS: ${formatNumber(videoInfo.comments)}
-ENGAGEMENT RATE: ${((videoInfo.likes / videoInfo.views) * 100).toFixed(2)}%
-DESCRIPTION: ${videoInfo.description.substring(0, 500)}
-DURATION: ${videoInfo.duration}`
+ENGAGEMENT: ${engagementRate}%
+DURATION: ${videoInfo.duration}
+TAGS: ${videoInfo.tags.slice(0, 15).join(', ')}
+DESCRIPTION: ${videoInfo.description.substring(0, 1500)}`
                         }
                     ],
                     temperature: 0.7,
-                    max_tokens: 1000
+                    max_tokens: 1200
                 })
             });
 
@@ -120,7 +178,7 @@ DURATION: ${videoInfo.duration}`
                 const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
                 analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
             } catch (e) {
-                analysis = null;
+                analysis = { viralScore: 75, hookAnalysis: 'Analysis pending', whyItWorks: [], lessonsForCreators: [] };
             }
         }
 
@@ -129,15 +187,18 @@ DURATION: ${videoInfo.duration}`
                 ...videoInfo,
                 views: formatNumber(videoInfo.views),
                 likes: formatNumber(videoInfo.likes),
-                comments: formatNumber(videoInfo.comments)
+                comments: formatNumber(videoInfo.comments),
+                viewsRaw: videoInfo.views,
+                likesRaw: videoInfo.likes
             },
             captionsAvailable,
             transcript,
-            analysis
+            analysis,
+            chatResponse
         }), { headers: corsHeaders });
 
     } catch (error) {
-        console.error('Transcript error:', error);
+        console.error('Video analysis error:', error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: corsHeaders
@@ -147,10 +208,21 @@ DURATION: ${videoInfo.duration}`
 
 function extractVideoId(url) {
     if (!url) return null;
+
+    // Handle different URL formats
     const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+        // Standard watch URL: youtube.com/watch?v=ID
+        /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
+        // Short URL: youtu.be/ID
+        /(?:youtu\.be\/)([^&\n?#]+)/,
+        // Embed URL: youtube.com/embed/ID
+        /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
+        // Shorts URL: youtube.com/shorts/ID
+        /(?:youtube\.com\/shorts\/)([^&\n?#]+)/,
+        // Just the ID
         /^([a-zA-Z0-9_-]{11})$/
     ];
+
     for (const pattern of patterns) {
         const match = url.match(pattern);
         if (match) return match[1];

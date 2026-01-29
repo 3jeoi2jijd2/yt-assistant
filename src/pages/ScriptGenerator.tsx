@@ -45,7 +45,7 @@ export default function ScriptGenerator() {
         setChatLoading(true);
         setError('');
         try {
-            const response = await fetch('/.netlify/functions/ai-chat', {
+            const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -96,7 +96,7 @@ export default function ScriptGenerator() {
         setChatLoading(true);
 
         try {
-            const response = await fetch('/.netlify/functions/ai-chat', {
+            const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -158,7 +158,7 @@ export default function ScriptGenerator() {
         setLoading(true);
 
         try {
-            const response = await fetch('/.netlify/functions/generate-script', {
+            const response = await fetch('/api/generate-script', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ niche, topic, platform, scriptLength })

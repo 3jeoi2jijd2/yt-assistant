@@ -34,7 +34,7 @@ export default function CompetitorSpy() {
         setAnalysis(null);
 
         try {
-            const response = await fetch('/.netlify/functions/analyze-competitor', {
+            const response = await fetch('/api/analyze-competitor', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ channelName })

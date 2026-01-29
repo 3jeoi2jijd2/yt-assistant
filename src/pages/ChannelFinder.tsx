@@ -33,7 +33,7 @@ export default function ChannelFinder() {
         setLoading(true);
 
         try {
-            const response = await fetch('/.netlify/functions/search-channels', {
+            const response = await fetch('/api/search-channels', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })

@@ -34,7 +34,7 @@ export default function ContentCalendar() {
         setError('');
 
         try {
-            const response = await fetch('/.netlify/functions/generate-calendar', {
+            const response = await fetch('/api/generate-calendar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ niche })

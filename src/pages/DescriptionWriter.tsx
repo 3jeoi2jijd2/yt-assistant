@@ -29,7 +29,7 @@ export default function DescriptionWriter() {
         setDescription('');
 
         try {
-            const response = await fetch('/.netlify/functions/generate-description', {
+            const response = await fetch('/api/generate-description', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

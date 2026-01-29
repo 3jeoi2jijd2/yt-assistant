@@ -36,7 +36,7 @@ export default function HookGenerator() {
         setHooks([]);
 
         try {
-            const response = await fetch('/.netlify/functions/generate-hooks', {
+            const response = await fetch('/api/generate-hooks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic, hookType, duration })

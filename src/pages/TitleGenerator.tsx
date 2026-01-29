@@ -37,7 +37,7 @@ export default function TitleGenerator() {
         setTitles([]);
 
         try {
-            const response = await fetch('/.netlify/functions/generate-titles', {
+            const response = await fetch('/api/generate-titles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic, platform, style })

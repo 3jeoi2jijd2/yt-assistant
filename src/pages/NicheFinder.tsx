@@ -27,7 +27,7 @@ export default function NicheFinder() {
         setLoading(true);
 
         try {
-            const response = await fetch('/.netlify/functions/find-niches', {
+            const response = await fetch('/api/find-niches', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ category })

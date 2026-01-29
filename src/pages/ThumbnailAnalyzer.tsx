@@ -28,7 +28,7 @@ export default function ThumbnailAnalyzer() {
         setAnalysis(null);
 
         try {
-            const response = await fetch('/.netlify/functions/analyze-thumbnail', {
+            const response = await fetch('/api/analyze-thumbnail', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ imageUrl })

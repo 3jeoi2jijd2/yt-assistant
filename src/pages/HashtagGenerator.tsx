@@ -27,7 +27,7 @@ export default function HashtagGenerator() {
         setHashtags([]);
 
         try {
-            const response = await fetch('/.netlify/functions/generate-hashtags', {
+            const response = await fetch('/api/generate-hashtags', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic, platform })

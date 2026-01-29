@@ -46,7 +46,7 @@ export default function TrendRadar() {
         setSelectedTrend(null);
 
         try {
-            const response = await fetch('/.netlify/functions/get-trends', {
+            const response = await fetch('/api/get-trends', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ category })

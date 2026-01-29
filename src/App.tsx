@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import {
     FileText,
@@ -21,7 +21,6 @@ import {
     Video,
     Music,
     Settings as SettingsIcon,
-    User,
     Wrench
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,8 +31,7 @@ import ChannelFinder from './pages/ChannelFinder';
 import NicheFinder from './pages/NicheFinder';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
-import SettingsPage from './pages/Settings';
-import Resources from './pages/Resources';
+import Resources from './pages/Resources'; // Keep Resources for now, it's not explicitly removed from pages list, only from sidebar
 
 // Tool Pages
 import ThumbnailAnalyzer from './pages/ThumbnailAnalyzer';
@@ -46,12 +44,16 @@ import TrendRadar from './pages/TrendRadar';
 import CompetitorSpy from './pages/CompetitorSpy';
 import VideoAnalyzer from './pages/VideoAnalyzer';
 import TikTokAnalyzer from './pages/TikTokAnalyzer';
+import SettingsPage from './pages/Settings';
+import Trailer from './pages/Trailer';
 
 import './index.css';
 
 function Sidebar() {
     const { user, isMockMode, signOut } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const location = useLocation();
+
 
     return (
         <>
@@ -74,7 +76,7 @@ function Sidebar() {
             <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
                 <div className="sidebar-logo">
                     <Sparkles size={28} />
-                    <h1>YT Assistant</h1>
+                    <h1>TubeRocket</h1>
                 </div>
 
                 {isMockMode && (
@@ -188,6 +190,7 @@ function Sidebar() {
 
 function AppContent() {
     const { user, loading, isMockMode } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -239,6 +242,9 @@ function AppContent() {
                     <Route path="/content-calendar" element={showApp ? <ContentCalendar /> : <Navigate to="/auth" />} />
                     <Route path="/dashboard" element={showApp ? <Dashboard /> : <Navigate to="/auth" />} />
                     <Route path="/settings" element={showApp ? <SettingsPage /> : <Navigate to="/auth" />} />
+
+                    {/* Trailer Mode */}
+                    <Route path="/trailer" element={<Trailer />} />
 
                     <Route path="*" element={<Navigate to={showApp ? "/dashboard" : "/auth"} replace />} />
                 </Routes>

@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
+            // In a real application, you might fetch user's pro status from your database here
             setLoading(false);
         });
 
@@ -60,11 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const signOut = async () => {
-        if (!isMockMode) {
+        setLoading(true);
+        if (isMockMode) { // Changed from isMockModeCache to isMockMode
+            setUser(null);
+            setSession(null);
+        } else {
             await supabase.auth.signOut();
         }
-        setUser(null);
-        setSession(null);
+        setLoading(false);
     };
 
     const value = { user, session, loading, isMockMode, signIn, signUp, signOut };

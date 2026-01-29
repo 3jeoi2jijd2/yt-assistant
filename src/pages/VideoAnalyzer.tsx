@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Video, Search, TrendingUp, Lightbulb, Target, Sparkles, ThumbsUp, Eye, CheckCircle, Send, BookOpen, ListOrdered, MessageSquare, Copy, Check, Clapperboard } from 'lucide-react';
+import { Video, Search, TrendingUp, Lightbulb, Target, ThumbsUp, Eye, CheckCircle, Send, ListOrdered, MessageSquare, Copy, Check, Clapperboard } from 'lucide-react';
 
 interface VideoInfo {
     id: string;
@@ -112,10 +112,10 @@ export default function VideoAnalyzer() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const getScoreColor = (score: number) => {
-        if (score >= 80) return 'var(--success)';
-        if (score >= 60) return 'var(--warning)';
-        return 'var(--error)';
+    const getScoreClass = (score: number) => {
+        if (score >= 80) return 'high';
+        if (score >= 60) return 'medium';
+        return 'low';
     };
 
     const getDifficultyColor = (diff: string) => {
@@ -127,8 +127,8 @@ export default function VideoAnalyzer() {
     return (
         <div className="animate-fadeIn">
             <div className="page-header">
-                <h1 className="flex items-center gap-3">
-                    <Video size={32} style={{ color: 'var(--accent-youtube)' }} />
+                <h1>
+                    <Video size={32} />
                     Video Analyzer
                 </h1>
                 <p>Analyze any YouTube video and get step-by-step recreation guide</p>
@@ -136,12 +136,12 @@ export default function VideoAnalyzer() {
 
             {/* Search */}
             <form onSubmit={handleAnalyze} className="card mb-6">
-                <div className="flex gap-3 flex-wrap">
-                    <div className="form-group flex-1" style={{ marginBottom: 0, minWidth: '200px' }}>
+                <div className="flex gap-3">
+                    <div className="form-group flex-1" style={{ marginBottom: 0 }}>
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="Paste any YouTube URL..."
+                            placeholder="Paste any YouTube URL (youtube.com/watch, youtu.be, shorts)..."
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
                         />
@@ -169,274 +169,243 @@ export default function VideoAnalyzer() {
 
             {video && !loading && (
                 <div className="animate-slideUp space-y-6">
-                    {/* Top Row: Video + Stats + Score */}
-                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="stat-card">
+                            <div className="icon">
+                                <Eye size={24} />
+                            </div>
+                            <div className="value">{video.views}</div>
+                            <div className="label">Views</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="icon" style={{ background: 'linear-gradient(135deg, #22c55e, #10b981)' }}>
+                                <ThumbsUp size={24} />
+                            </div>
+                            <div className="value">{video.likes}</div>
+                            <div className="label">Likes</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #22d3ee)' }}>
+                                <MessageSquare size={24} />
+                            </div>
+                            <div className="value">{video.comments}</div>
+                            <div className="label">Comments</div>
+                        </div>
+                        {analysis && (
+                            <div className="stat-card">
+                                <div className={`score-circle ${getScoreClass(analysis.viralScore)}`} style={{ margin: '0 auto 0.5rem' }}>
+                                    {analysis.viralScore}
+                                </div>
+                                <div className="label">Viral Score</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Video Info + AI Chat */}
+                    <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                        {/* Video Card */}
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                             <img
                                 src={video.thumbnail}
                                 alt={video.title}
                                 style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover' }}
                             />
-                            <div style={{ padding: '1rem' }}>
-                                <h3 style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem', lineHeight: 1.3 }}>
+                            <div style={{ padding: '1.25rem' }}>
+                                <h3 style={{ fontWeight: 600, marginBottom: '0.5rem', lineHeight: 1.3 }}>
                                     {video.title}
                                 </h3>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                                     {video.channel}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="card flex flex-col justify-center items-center">
-                            <Eye size={24} style={{ color: 'var(--accent-primary)', marginBottom: '0.5rem' }} />
-                            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.views}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Views</span>
-                        </div>
-
-                        <div className="card flex flex-col justify-center items-center">
-                            <ThumbsUp size={24} style={{ color: 'var(--success)', marginBottom: '0.5rem' }} />
-                            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{video.likes}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Likes</span>
-                        </div>
-
-                        {analysis && (
-                            <div className="card flex flex-col justify-center items-center">
-                                <div style={{
-                                    width: 70,
-                                    height: 70,
-                                    borderRadius: '50%',
-                                    border: `4px solid ${getScoreColor(analysis.viralScore)}`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '1.3rem',
-                                    fontWeight: 700,
-                                    color: getScoreColor(analysis.viralScore)
-                                }}>
-                                    {analysis.viralScore}
-                                </div>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>Viral Score</span>
+                        {/* AI Chat */}
+                        <div className="ai-chat-box">
+                            <div className="ai-chat-header">
+                                <MessageSquare size={18} />
+                                <span>Ask About This Video</span>
                             </div>
-                        )}
+
+                            <div className="ai-chat-messages">
+                                {chatHistory.length === 0 ? (
+                                    <div className="ai-chat-placeholder">
+                                        <p>🎬 Ask me anything about this video!</p>
+                                        <div className="suggestions">
+                                            "What editing software did they use?"<br />
+                                            "How can I make my version unique?"<br />
+                                            "What's the filming technique?"
+                                        </div>
+                                    </div>
+                                ) : (
+                                    chatHistory.map((msg, i) => (
+                                        <div key={i} className={`ai-message ${msg.role}`}>
+                                            {msg.content}
+                                        </div>
+                                    ))
+                                )}
+                                {chatLoading && (
+                                    <div className="ai-message assistant">
+                                        <div className="typing-indicator">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="ai-chat-input">
+                                <input
+                                    type="text"
+                                    placeholder="Ask anything..."
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
+                                />
+                                <button onClick={askQuestion} disabled={chatLoading}>
+                                    <Send size={16} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Main Content Grid */}
-                    <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                        {/* Left Column: Recreation Guide */}
-                        <div className="space-y-4">
-                            {/* Step-by-Step Recreation */}
-                            {analysis?.recreationSteps && (
-                                <div className="card">
-                                    <div className="card-header" style={{ marginBottom: '1rem' }}>
-                                        <h3 className="card-title flex items-center gap-2">
-                                            <ListOrdered size={20} style={{ color: 'var(--accent-primary)' }} />
-                                            How to Recreate This Video
-                                        </h3>
-                                        <button onClick={copyRecreationSteps} className="btn btn-secondary btn-sm">
-                                            {copied ? <Check size={14} /> : <Copy size={14} />}
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {analysis.recreationSteps.map((step, i) => (
-                                            <div key={i} className="flex gap-3" style={{
-                                                padding: '0.75rem',
-                                                background: 'var(--bg-tertiary)',
-                                                borderRadius: '0.5rem',
-                                                borderLeft: '3px solid var(--accent-primary)'
-                                            }}>
-                                                <span style={{
-                                                    background: 'var(--accent-primary)',
-                                                    color: 'white',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 600,
-                                                    flexShrink: 0
-                                                }}>
-                                                    {i + 1}
-                                                </span>
-                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{step}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Quick Stats */}
-                                    <div className="grid grid-cols-3 gap-2 mt-4">
-                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Difficulty</p>
-                                            <p style={{ fontWeight: 600, color: getDifficultyColor(analysis.difficulty) }}>{analysis.difficulty}</p>
-                                        </div>
-                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Est. Budget</p>
-                                            <p style={{ fontWeight: 600 }}>{analysis.estimatedBudget}</p>
-                                        </div>
-                                        <div style={{ padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Equipment</p>
-                                            <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>{analysis.equipmentNeeded?.length || 0} items</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Equipment Needed */}
-                            {analysis?.equipmentNeeded && (
-                                <div className="card">
-                                    <h3 className="card-title flex items-center gap-2 mb-3">
-                                        <Clapperboard size={18} style={{ color: 'var(--warning)' }} />
-                                        Equipment Needed
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {analysis.equipmentNeeded.map((item, i) => (
-                                            <span key={i} className="badge badge-primary">{item}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* AI Chat */}
-                            <div className="card">
-                                <h3 className="card-title flex items-center gap-2 mb-3">
-                                    <MessageSquare size={18} style={{ color: 'var(--accent-primary)' }} />
-                                    Ask About This Video
+                    {/* Recreation Steps */}
+                    {analysis?.recreationSteps && (
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">
+                                    <ListOrdered size={20} />
+                                    How to Recreate This Video
                                 </h3>
+                                <button onClick={copyRecreationSteps} className="btn btn-secondary btn-sm">
+                                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                                    {copied ? 'Copied!' : 'Copy Steps'}
+                                </button>
+                            </div>
 
-                                <div style={{
-                                    minHeight: '150px',
-                                    maxHeight: '250px',
-                                    overflowY: 'auto',
-                                    marginBottom: '1rem',
-                                    padding: '0.5rem',
-                                    background: 'var(--bg-tertiary)',
-                                    borderRadius: '0.5rem'
-                                }}>
-                                    {chatHistory.length === 0 ? (
-                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
-                                            Ask anything!
-                                            <br /><br />
-                                            • "What editing software did they use?"
-                                            <br />• "How can I make my version unique?"
-                                            <br />• "What's the filming technique?"
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {chatHistory.map((msg, i) => (
-                                                <div key={i} style={{
-                                                    padding: '0.5rem 0.75rem',
-                                                    borderRadius: '0.5rem',
-                                                    background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                                                    fontSize: '0.85rem'
-                                                }}>
-                                                    {msg.content}
-                                                </div>
-                                            ))}
-                                            {chatLoading && (
-                                                <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                                    Thinking...
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                <div style={{ padding: '1rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Difficulty</p>
+                                    <p style={{ fontWeight: 700, color: getDifficultyColor(analysis.difficulty), fontSize: '1.1rem' }}>{analysis.difficulty}</p>
                                 </div>
-
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Ask anything..."
-                                        value={question}
-                                        onChange={(e) => setQuestion(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
-                                        style={{ fontSize: '0.85rem' }}
-                                    />
-                                    <button onClick={askQuestion} className="btn btn-primary btn-sm" disabled={chatLoading}>
-                                        <Send size={16} />
-                                    </button>
+                                <div style={{ padding: '1rem', background: 'rgba(6, 182, 212, 0.1)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Est. Budget</p>
+                                    <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>{analysis.estimatedBudget}</p>
+                                </div>
+                                <div style={{ padding: '1rem', background: 'rgba(236, 72, 153, 0.1)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Equipment</p>
+                                    <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>{analysis.equipmentNeeded?.length || 0} items</p>
                                 </div>
                             </div>
+
+                            <div className="step-list">
+                                {analysis.recreationSteps.map((step, i) => (
+                                    <div key={i} className="step-item">
+                                        <div className="step-number">{i + 1}</div>
+                                        <div className="step-content">{step}</div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
+                    )}
 
-                        {/* Right Column: Analysis */}
-                        <div className="space-y-4">
-                            {analysis && (
-                                <>
-                                    {/* Hook Analysis */}
-                                    <div className="card">
-                                        <h3 className="card-title flex items-center gap-2 mb-3">
-                                            <Target size={18} style={{ color: 'var(--accent-youtube)' }} />
-                                            Hook Analysis
-                                        </h3>
-                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{analysis.hookAnalysis}</p>
-                                    </div>
-
-                                    {/* Why It Works */}
-                                    <div className="card">
-                                        <h3 className="card-title flex items-center gap-2 mb-3">
-                                            <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                                            Why It Works
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {analysis.whyItWorks?.map((reason, i) => (
-                                                <div key={i} style={{
-                                                    padding: '0.5rem 0.75rem',
-                                                    background: 'var(--bg-tertiary)',
-                                                    borderRadius: '0.5rem',
-                                                    fontSize: '0.9rem',
-                                                    borderLeft: '3px solid var(--success)'
-                                                }}>
-                                                    ✓ {reason}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Viral Formulas Used */}
-                                    <div className="card">
-                                        <h3 className="card-title flex items-center gap-2 mb-3">
-                                            <TrendingUp size={18} style={{ color: 'var(--accent-primary)' }} />
-                                            Viral Formulas Used
-                                        </h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {analysis.viralFormulas?.map((formula, i) => (
-                                                <span key={i} style={{
-                                                    padding: '0.5rem 0.75rem',
-                                                    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
-                                                    borderRadius: '1rem',
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: 500
-                                                }}>
-                                                    {formula}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Lessons */}
-                                    <div className="card">
-                                        <h3 className="card-title flex items-center gap-2 mb-3">
-                                            <Lightbulb size={18} style={{ color: 'var(--warning)' }} />
-                                            Key Lessons
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {analysis.lessonsForCreators?.map((lesson, i) => (
-                                                <div key={i} style={{
-                                                    padding: '0.5rem 0.75rem',
-                                                    background: 'var(--bg-tertiary)',
-                                                    borderRadius: '0.5rem',
-                                                    fontSize: '0.9rem'
-                                                }}>
-                                                    💡 {lesson}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                    {/* Equipment */}
+                    {analysis?.equipmentNeeded && (
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">
+                                    <Clapperboard size={20} style={{ color: 'var(--warning)' }} />
+                                    Equipment Needed
+                                </h3>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {analysis.equipmentNeeded.map((item, i) => (
+                                    <span key={i} className="badge badge-primary">{item}</span>
+                                ))}
+                            </div>
                         </div>
+                    )}
+
+                    {/* Analysis Grid */}
+                    <div className="grid grid-cols-2 gap-6">
+                        {/* Hook Analysis */}
+                        {analysis && (
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">
+                                        <Target size={20} style={{ color: 'var(--accent-youtube)' }} />
+                                        Hook Analysis
+                                    </h3>
+                                </div>
+                                <p style={{ color: 'var(--text-secondary)' }}>{analysis.hookAnalysis}</p>
+                            </div>
+                        )}
+
+                        {/* Why It Works */}
+                        {analysis && (
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">
+                                        <CheckCircle size={20} style={{ color: 'var(--success)' }} />
+                                        Why It Works
+                                    </h3>
+                                </div>
+                                <div className="space-y-2">
+                                    {analysis.whyItWorks?.map((reason, i) => (
+                                        <div key={i} style={{
+                                            padding: '0.75rem',
+                                            background: 'rgba(16, 185, 129, 0.1)',
+                                            borderRadius: 'var(--radius-md)',
+                                            fontSize: '0.9rem',
+                                            borderLeft: '3px solid var(--success)'
+                                        }}>
+                                            ✓ {reason}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Viral Formulas */}
+                        {analysis && (
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">
+                                        <TrendingUp size={20} />
+                                        Viral Formulas Used
+                                    </h3>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {analysis.viralFormulas?.map((formula, i) => (
+                                        <span key={i} className="badge badge-primary">{formula}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Key Lessons */}
+                        {analysis && (
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">
+                                        <Lightbulb size={20} style={{ color: 'var(--warning)' }} />
+                                        Key Lessons
+                                    </h3>
+                                </div>
+                                <div className="space-y-2">
+                                    {analysis.lessonsForCreators?.map((lesson, i) => (
+                                        <div key={i} style={{
+                                            padding: '0.75rem',
+                                            background: 'rgba(245, 158, 11, 0.1)',
+                                            borderRadius: 'var(--radius-md)',
+                                            fontSize: '0.9rem'
+                                        }}>
+                                            💡 {lesson}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

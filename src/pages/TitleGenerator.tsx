@@ -1,41 +1,29 @@
 import { useState } from 'react';
-import { Type, Copy, Check, RefreshCw, Sparkles, Send, MessageSquare } from 'lucide-react';
+import { Type, Sparkles, Copy, Check, RefreshCw, MessageSquare, Send } from 'lucide-react';
 
-const platforms = [
-    { id: 'youtube', name: 'YouTube', icon: '📺' },
-    { id: 'tiktok', name: 'TikTok', icon: '🎵' },
-    { id: 'instagram', name: 'Instagram Reels', icon: '📸' },
-    { id: 'shorts', name: 'YouTube Shorts', icon: '⚡' }
-];
-
-const titleStyles = [
-    { id: 'curiosity', name: 'Curiosity Gap', emoji: '🤔', desc: 'Creates mystery' },
-    { id: 'listicle', name: 'Listicle', emoji: '📝', desc: 'Numbered lists' },
-    { id: 'howto', name: 'How-To', emoji: '🔧', desc: 'Tutorial style' },
-    { id: 'controversial', name: 'Controversial', emoji: '🔥', desc: 'Bold takes' },
-    { id: 'emotional', name: 'Emotional', emoji: '💔', desc: 'Feelings-based' },
-    { id: 'urgency', name: 'Urgency', emoji: '⚡', desc: 'Time-sensitive' }
-];
+interface GeneratedTitle {
+    title: string;
+    score: number;
+    whyItWorks: string;
+}
 
 export default function TitleGenerator() {
     const [topic, setTopic] = useState('');
-    const [platform, setPlatform] = useState('youtube');
-    const [style, setStyle] = useState('curiosity');
+    const [niche, setNiche] = useState('');
+    const [style, setStyle] = useState<'curiosity' | 'how-to' | 'listicle' | 'controversial'>('curiosity');
     const [loading, setLoading] = useState(false);
-    const [titles, setTitles] = useState<string[]>([]);
-    const [copied, setCopied] = useState<number | null>(null);
+    const [titles, setTitles] = useState<GeneratedTitle[]>([]);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const [error, setError] = useState('');
 
-    // AI Chat state
+    // AI Chat
     const [question, setQuestion] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
     const [chatHistory, setChatHistory] = useState<Array<{ role: string, content: string }>>([]);
 
-    const handleGenerate = async () => {
-        if (!topic.trim()) {
-            setError('Please enter a topic');
-            return;
-        }
+    const handleGenerate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!topic.trim()) return;
 
         setLoading(true);
         setError('');
@@ -45,7 +33,7 @@ export default function TitleGenerator() {
             const response = await fetch('/api/generate-titles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic, platform, style })
+                body: JSON.stringify({ topic, niche, style })
             });
 
             const data = await response.json();
@@ -54,7 +42,7 @@ export default function TitleGenerator() {
                 throw new Error(data.error || 'Failed to generate titles');
             }
 
-            setTitles(data.titles || []);
+            setTitles(data.titles);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to generate titles');
         } finally {
@@ -64,8 +52,14 @@ export default function TitleGenerator() {
 
     const handleCopy = async (title: string, index: number) => {
         await navigator.clipboard.writeText(title);
-        setCopied(index);
-        setTimeout(() => setCopied(null), 2000);
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex(null), 2000);
+    };
+
+    const getScoreClass = (score: number) => {
+        if (score >= 80) return 'high';
+        if (score >= 60) return 'medium';
+        return 'low';
     };
 
     const askAI = async () => {
@@ -78,15 +72,15 @@ export default function TitleGenerator() {
 
         try {
             const context = titles.length > 0
-                ? `User generated these titles for "${topic}":\n${titles.join('\n')}\n\nNow they're asking:`
-                : `User is working on titles for "${topic || 'their video'}". They're asking:`;
+                ? `User generated titles for "${topic}". Top titles: ${titles.slice(0, 3).map(t => t.title).join(', ')}. They ask:`
+                : `User is creating titles for YouTube videos. They ask:`;
 
             const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: [
-                        { role: 'system', content: `You are an expert at viral YouTube/TikTok titles. Help the user improve their titles. Be specific and actionable. ${context}` },
+                        { role: 'system', content: `You are a YouTube title expert (Jan 2026). Help create viral, clickable titles. Be specific and creative. ${context}` },
                         ...chatHistory.map(m => ({ role: m.role, content: m.content })),
                         { role: 'user', content: userQuestion }
                     ]
@@ -107,130 +101,122 @@ export default function TitleGenerator() {
     return (
         <div className="animate-fadeIn">
             <div className="page-header">
-                <h1 className="flex items-center gap-3">
-                    <Type size={32} style={{ color: 'var(--accent-primary)' }} />
+                <h1>
+                    <Type size={32} />
                     Viral Title Generator
                 </h1>
-                <p>Generate click-worthy titles that drive views and engagement</p>
+                <p>AI-powered titles that maximize CTR and views</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
-                {/* Main Form */}
-                <div className="col-span-2">
-                    <div className="card mb-6">
-                        <div className="form-group mb-4">
-                            <label className="form-label">What's your video about?</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g., morning routine for productivity, how I made $10k..."
-                                value={topic}
-                                onChange={(e) => setTopic(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="form-group mb-4">
-                            <label className="form-label">Platform</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {platforms.map((p) => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => setPlatform(p.id)}
-                                        className={`btn ${platform === p.id ? 'btn-primary' : 'btn-secondary'}`}
-                                        style={{ flexDirection: 'column', padding: '0.75rem', gap: '0.25rem' }}
-                                    >
-                                        <span style={{ fontSize: '1.25rem' }}>{p.icon}</span>
-                                        <span style={{ fontSize: '0.75rem' }}>{p.name}</span>
-                                    </button>
-                                ))}
+            <div className="grid gap-6" style={{ gridTemplateColumns: '2fr 1fr' }}>
+                {/* Main Content */}
+                <div className="space-y-6">
+                    {/* Form */}
+                    <form onSubmit={handleGenerate} className="card">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Video Topic *</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="e.g., iPhone 16 review, morning routine, day trading..."
+                                    value={topic}
+                                    onChange={(e) => setTopic(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Niche (Optional)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="e.g., Tech, Fitness, Finance..."
+                                    value={niche}
+                                    onChange={(e) => setNiche(e.target.value)}
+                                />
                             </div>
                         </div>
 
                         <div className="form-group mb-4">
                             <label className="form-label">Title Style</label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {titleStyles.map((s) => (
+                            <div className="grid grid-cols-4 gap-2">
+                                {[
+                                    { value: 'curiosity', label: '🧠 Curiosity Gap' },
+                                    { value: 'how-to', label: '📚 How-To' },
+                                    { value: 'listicle', label: '📋 Listicle' },
+                                    { value: 'controversial', label: '🔥 Controversial' }
+                                ].map(option => (
                                     <button
-                                        key={s.id}
-                                        onClick={() => setStyle(s.id)}
-                                        className={`btn ${style === s.id ? 'btn-primary' : 'btn-secondary'}`}
-                                        style={{ flexDirection: 'column', padding: '0.75rem', gap: '0.25rem', alignItems: 'flex-start' }}
+                                        key={option.value}
+                                        type="button"
+                                        className={`btn ${style === option.value ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setStyle(option.value as any)}
                                     >
-                                        <span>{s.emoji} {s.name}</span>
-                                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{s.desc}</span>
+                                        {option.label}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleGenerate}
-                            className="btn btn-primary btn-lg w-full"
-                            disabled={loading}
-                        >
+                        <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading || !topic.trim()}>
                             {loading ? (
                                 <>
-                                    <div className="loading-spinner" style={{ width: '20px', height: '20px' }}></div>
-                                    Generating Viral Titles...
+                                    <span className="loading-spinner" style={{ width: 20, height: 20 }} />
+                                    Generating...
                                 </>
                             ) : (
                                 <>
                                     <Sparkles size={20} />
-                                    Generate Titles
+                                    Generate Viral Titles
                                 </>
                             )}
                         </button>
-                    </div>
+                    </form>
 
-                    {error && (
-                        <div className="alert alert-error mb-4">{error}</div>
-                    )}
+                    {error && <div className="alert alert-error">{error}</div>}
 
+                    {/* Results */}
                     {titles.length > 0 && (
                         <div className="card animate-slideUp">
                             <div className="card-header">
-                                <h3 className="card-title flex items-center gap-2">
-                                    <Sparkles size={20} style={{ color: 'var(--accent-primary)' }} />
-                                    Generated Titles ({titles.length})
+                                <h3 className="card-title">
+                                    <Sparkles size={20} />
+                                    Generated Titles
                                 </h3>
-                                <button onClick={handleGenerate} className="btn btn-secondary btn-sm">
-                                    <RefreshCw size={16} />
-                                    Regenerate
+                                <button onClick={handleGenerate} className="btn btn-secondary btn-sm" disabled={loading}>
+                                    <RefreshCw size={14} /> Regenerate
                                 </button>
                             </div>
-                            <div className="space-y-3">
-                                {titles.map((title, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center gap-3 p-4"
-                                        style={{
-                                            background: 'var(--bg-tertiary)',
-                                            borderRadius: '0.75rem',
-                                            border: '1px solid var(--border-color)'
-                                        }}
-                                    >
-                                        <span style={{
-                                            background: 'var(--accent-primary)',
-                                            color: 'white',
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '50%',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '0.875rem',
-                                            fontWeight: 600,
-                                            flexShrink: 0
-                                        }}>
-                                            {index + 1}
-                                        </span>
-                                        <span style={{ flex: 1, fontWeight: 500 }}>{title}</span>
-                                        <button
-                                            onClick={() => handleCopy(title, index)}
-                                            className="btn btn-secondary btn-sm"
-                                        >
-                                            {copied === index ? <Check size={16} /> : <Copy size={16} />}
-                                        </button>
+
+                            <div className="space-y-4">
+                                {titles.map((item, index) => (
+                                    <div key={index} style={{
+                                        padding: '1.25rem',
+                                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(6, 182, 212, 0.02))',
+                                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                                        borderRadius: 'var(--radius-md)'
+                                    }}>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div style={{ flex: 1 }}>
+                                                <h4 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                                    {item.title}
+                                                </h4>
+                                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                    {item.whyItWorks}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`score-circle ${getScoreClass(item.score)}`} style={{ width: 50, height: 50, fontSize: '0.9rem' }}>
+                                                    {item.score}
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCopy(item.title, index)}
+                                                    className="btn btn-secondary btn-sm"
+                                                >
+                                                    {copiedIndex === index ? <Check size={14} /> : <Copy size={14} />}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -239,63 +225,47 @@ export default function TitleGenerator() {
                 </div>
 
                 {/* AI Chat Sidebar */}
-                <div className="card" style={{ height: 'fit-content', position: 'sticky', top: '1rem' }}>
-                    <h3 className="card-title flex items-center gap-2 mb-4">
-                        <MessageSquare size={20} style={{ color: 'var(--accent-primary)' }} />
-                        AI Title Assistant
-                    </h3>
+                <div className="ai-chat-box" style={{ position: 'sticky', top: '2rem', height: 'fit-content' }}>
+                    <div className="ai-chat-header">
+                        <MessageSquare size={18} />
+                        <span>Title AI Assistant</span>
+                    </div>
 
-                    <div style={{
-                        height: '300px',
-                        overflowY: 'auto',
-                        marginBottom: '1rem',
-                        padding: '0.5rem',
-                        background: 'var(--bg-tertiary)',
-                        borderRadius: '0.5rem'
-                    }}>
+                    <div className="ai-chat-messages">
                         {chatHistory.length === 0 ? (
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
-                                Ask me anything about titles!
-                                <br /><br />
-                                Examples:
-                                <br />• "Make this title more clickable"
-                                <br />• "Which title is best?"
-                                <br />• "Give me a controversial angle"
+                            <div className="ai-chat-placeholder">
+                                <p>✍️ Need help with titles?</p>
+                                <div className="suggestions">
+                                    "Make it more clickable"<br />
+                                    "Give me 5 variations"<br />
+                                    "Which title is best?"
+                                </div>
                             </div>
                         ) : (
-                            <div className="space-y-2">
-                                {chatHistory.map((msg, i) => (
-                                    <div key={i} style={{
-                                        padding: '0.5rem 0.75rem',
-                                        borderRadius: '0.5rem',
-                                        background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                                        fontSize: '0.85rem',
-                                        marginLeft: msg.role === 'user' ? '1rem' : 0,
-                                        marginRight: msg.role === 'assistant' ? '1rem' : 0
-                                    }}>
-                                        {msg.content}
-                                    </div>
-                                ))}
-                                {chatLoading && (
-                                    <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                        Thinking...
-                                    </div>
-                                )}
+                            chatHistory.map((msg, i) => (
+                                <div key={i} className={`ai-message ${msg.role}`}>
+                                    {msg.content}
+                                </div>
+                            ))
+                        )}
+                        {chatLoading && (
+                            <div className="ai-message assistant">
+                                <div className="typing-indicator">
+                                    <span></span><span></span><span></span>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="ai-chat-input">
                         <input
                             type="text"
-                            className="form-input"
                             placeholder="Ask about titles..."
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && askAI()}
-                            style={{ fontSize: '0.85rem' }}
                         />
-                        <button onClick={askAI} className="btn btn-primary btn-sm" disabled={chatLoading}>
+                        <button onClick={askAI} disabled={chatLoading}>
                             <Send size={16} />
                         </button>
                     </div>

@@ -19,7 +19,9 @@ import {
     Radar,
     Eye,
     Video,
-    Music
+    Music,
+    Settings as SettingsIcon,
+    User
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -29,8 +31,9 @@ import ChannelFinder from './pages/ChannelFinder';
 import NicheFinder from './pages/NicheFinder';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
+import SettingsPage from './pages/Settings';
 
-// New Pages
+// Tool Pages
 import ThumbnailAnalyzer from './pages/ThumbnailAnalyzer';
 import TitleGenerator from './pages/TitleGenerator';
 import HashtagGenerator from './pages/HashtagGenerator';
@@ -80,6 +83,18 @@ function Sidebar() {
                 )}
 
                 <nav className="sidebar-nav">
+                    <div className="nav-section">
+                        <span className="nav-section-title">Plan</span>
+                        <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <LayoutDashboard size={20} />
+                            Dashboard
+                        </NavLink>
+                        <NavLink to="/content-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <Calendar size={20} />
+                            Content Calendar
+                        </NavLink>
+                    </div>
+
                     <div className="nav-section">
                         <span className="nav-section-title">Create</span>
                         <NavLink to="/script-generator" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -141,21 +156,17 @@ function Sidebar() {
                     </div>
 
                     <div className="nav-section">
-                        <span className="nav-section-title">Plan</span>
-                        <NavLink to="/content-calendar" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                            <Calendar size={20} />
-                            Content Calendar
-                        </NavLink>
-                        <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                            <LayoutDashboard size={20} />
-                            Dashboard
+                        <span className="nav-section-title">Account</span>
+                        <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                            <SettingsIcon size={20} />
+                            Settings
                         </NavLink>
                     </div>
                 </nav>
 
                 {user && (
                     <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.75rem', padding: '0 0.5rem' }}>
                             {user.email}
                         </div>
                         <button onClick={signOut} className="btn btn-secondary w-full">
@@ -220,6 +231,7 @@ function AppContent() {
                     {/* Plan */}
                     <Route path="/content-calendar" element={showApp ? <ContentCalendar /> : <Navigate to="/auth" />} />
                     <Route path="/dashboard" element={showApp ? <Dashboard /> : <Navigate to="/auth" />} />
+                    <Route path="/settings" element={showApp ? <SettingsPage /> : <Navigate to="/auth" />} />
 
                     <Route path="*" element={<Navigate to={showApp ? "/dashboard" : "/auth"} replace />} />
                 </Routes>

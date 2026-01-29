@@ -1325,3 +1325,50 @@ a:hover {
   background: var(--accent-yellow);
   color: var(--text-primary);
 }
+
+/* ========================================== */
+/* DARK MODE SUPPORT                          */
+/* ========================================== */
+
+[data-theme="dark"] {
+  /* Dark Theme Colors */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #171717;
+  --bg-tertiary: #262626;
+  --bg-card: #171717;
+  --bg-card-hover: #262626;
+
+  /* Adjust Text for Dark Mode */
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+
+  /* Adjust Accents for Dark Mode */
+  --accent-yellow: #facc15;
+  /* Slightly brighter yellow for contrast */
+  --accent-yellow-light: #422006;
+  /* Dark brown/gold background */
+
+  /* Borders */
+  --border-color: #262626;
+  --border-dark: #404040;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
+  --shadow-yellow: 0 4px 20px rgba(250, 204, 21, 0.2);
+}
+
+/* Dark Mode Background Pattern Change */
+[data-theme="dark"] body::before {
+  background-image: radial-gradient(circle, #404040 1px, transparent 1px);
+  opacity: 0.3;
+}
+
+/* Ensure header text contrast in auth/sidebar */
+[data-theme="dark"] .sidebar-logo h1,
+[data-theme="dark"] .auth-header h1 span {
+  color: #000;
+  /* Keep logo text dark on yellow background */
+}

@@ -185,10 +185,19 @@ function AppContent() {
 
     return (
         <div className="app-layout">
+            <div className="floating-shapes">
+                {/* Global shapes for all pages */}
+                <div className="shape shape-yellow"></div>
+                <div className="shape shape-blue"></div>
+                <div className="shape shape-red"></div>
+                <div className="shape shape-green"></div>
+                <div className="shape shape-purple"></div>
+            </div>
+
             {showApp && <Sidebar />}
             <main className="main-content" style={!showApp ? { marginLeft: 0 } : {}}>
                 <Routes>
-                    <Route path="/auth" element={showApp ? <Navigate to="/script-generator" /> : <Auth />} />
+                    <Route path="/auth" element={showApp ? <Navigate to="/dashboard" /> : <Auth />} />
 
                     {/* Create */}
                     <Route path="/script-generator" element={showApp ? <ScriptGenerator /> : <Navigate to="/auth" />} />
@@ -212,7 +221,7 @@ function AppContent() {
                     <Route path="/content-calendar" element={showApp ? <ContentCalendar /> : <Navigate to="/auth" />} />
                     <Route path="/dashboard" element={showApp ? <Dashboard /> : <Navigate to="/auth" />} />
 
-                    <Route path="*" element={<Navigate to={showApp ? "/script-generator" : "/auth"} replace />} />
+                    <Route path="*" element={<Navigate to={showApp ? "/dashboard" : "/auth"} replace />} />
                 </Routes>
             </main>
         </div>

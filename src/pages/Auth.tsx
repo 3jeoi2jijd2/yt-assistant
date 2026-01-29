@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Sparkles, Mail, Lock, ArrowRight, Check, Zap, Video, TrendingUp } from 'lucide-react';
+import { Sparkles, Mail, Lock, ArrowRight, Check, Zap, Video, TrendingUp, Star } from 'lucide-react';
 
 export default function Auth() {
     const [isLogin, setIsLogin] = useState(true);
@@ -35,55 +35,80 @@ export default function Auth() {
         setLoading(false);
     };
 
-    const features = [
-        { icon: <Zap size={18} />, text: 'AI Script Generator' },
-        { icon: <Video size={18} />, text: 'Video Analyzer' },
-        { icon: <TrendingUp size={18} />, text: 'Trend Radar' },
-    ];
-
     return (
         <div className="auth-container">
-            <div className="auth-card animate-slideUp">
-                {/* Logo & Title */}
-                <div className="auth-header">
-                    <div style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: '50%',
-                        background: 'var(--gradient-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 1rem',
-                        boxShadow: '0 0 30px rgba(168, 85, 247, 0.4)'
-                    }}>
-                        <Sparkles size={28} color="white" />
-                    </div>
-                    <h1>YT Assistant</h1>
-                    <p className="text-muted">Your AI-powered YouTube toolkit</p>
-                </div>
+            {/* Floating Shapes */}
+            <div className="floating-shapes">
+                <div className="shape shape-yellow" style={{ top: '10%', left: '8%', transform: 'rotate(15deg)' }}></div>
+                <div className="shape shape-blue" style={{ bottom: '25%', left: '12%' }}></div>
+                <div className="shape shape-red" style={{ top: '20%', right: '10%' }}></div>
+                <div className="shape shape-green" style={{ bottom: '15%', right: '8%', transform: 'rotate(-15deg)' }}></div>
+            </div>
 
-                {/* Features Preview */}
+            <div className="auth-card animate-slideUp">
+                {/* Badge */}
                 <div style={{
                     display: 'flex',
                     justifyContent: 'center',
-                    gap: '1rem',
-                    marginBottom: '1.5rem',
+                    marginBottom: '1.5rem'
+                }}>
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.4rem 1rem',
+                        background: 'var(--success-bg)',
+                        color: 'var(--success)',
+                        borderRadius: '9999px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        border: '1px solid var(--success)'
+                    }}>
+                        <Star size={14} fill="currentColor" />
+                        Free to Use
+                    </span>
+                </div>
+
+                {/* Logo & Title */}
+                <div className="auth-header">
+                    <h1>
+                        Chat with <span>AI.</span>
+                    </h1>
+                    <h1 style={{ marginTop: '-0.25rem' }}>
+                        <span>Go viral</span> on YouTube.
+                    </h1>
+                    <p className="text-muted" style={{ marginTop: '0.75rem' }}>
+                        Your AI-powered content creation toolkit
+                    </p>
+                </div>
+
+                {/* Feature Icons */}
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    marginBottom: '2rem',
                     flexWrap: 'wrap'
                 }}>
-                    {features.map((f, i) => (
+                    {[
+                        { icon: <Zap size={16} />, text: 'Scripts' },
+                        { icon: <Video size={16} />, text: 'Analyzer' },
+                        { icon: <TrendingUp size={16} />, text: 'Trends' },
+                        { icon: <Sparkles size={16} />, text: 'AI Chat' }
+                    ].map((f, i) => (
                         <div key={i} style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.4rem',
-                            fontSize: '0.75rem',
+                            gap: '0.35rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
                             color: 'var(--text-secondary)',
-                            background: 'rgba(168, 85, 247, 0.1)',
-                            padding: '0.35rem 0.7rem',
+                            background: 'var(--bg-tertiary)',
+                            padding: '0.4rem 0.75rem',
                             borderRadius: 'var(--radius-sm)',
-                            border: '1px solid rgba(168, 85, 247, 0.2)'
+                            border: '1px solid var(--border-color)'
                         }}>
-                            <span style={{ color: 'var(--accent-primary)' }}>{f.icon}</span>
+                            {f.icon}
                             {f.text}
                         </div>
                     ))}
@@ -119,7 +144,7 @@ export default function Auth() {
                             <input
                                 type="email"
                                 className="form-input"
-                                placeholder="Enter your email"
+                                placeholder="you@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
@@ -144,7 +169,7 @@ export default function Auth() {
                             <input
                                 type="password"
                                 className="form-input"
-                                placeholder={isLogin ? 'Enter your password' : 'Create a password (min 6 chars)'}
+                                placeholder={isLogin ? '••••••••' : 'Min 6 characters'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
@@ -184,25 +209,29 @@ export default function Auth() {
                             setSuccess('');
                         }}
                         style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--accent-primary)',
+                            background: 'var(--accent-yellow)',
+                            border: '2px solid var(--text-primary)',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: 'var(--radius-sm)',
                             cursor: 'pointer',
-                            fontWeight: 600
+                            fontWeight: 700,
+                            fontSize: '0.85rem'
                         }}
                     >
                         {isLogin ? 'Sign Up' : 'Sign In'}
                     </button>
                 </div>
 
-                {/* Footer */}
+                {/* Features Line */}
                 <div style={{
                     marginTop: '1.5rem',
                     textAlign: 'center',
                     fontSize: '0.7rem',
-                    color: 'var(--text-muted)'
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em'
                 }}>
-                    By continuing, you agree to our Terms of Service
+                    No install • Browser based • Instant access
                 </div>
             </div>
         </div>

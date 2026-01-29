@@ -4,11 +4,13 @@ import { Search, Users, Eye, TrendingUp, ExternalLink, Bookmark } from 'lucide-r
 interface Channel {
     id: string;
     title: string;
+    handle?: string;
     description: string;
     thumbnail: string;
     subscriberCount: string;
     videoCount: string;
     viewCount: string;
+    youtubeUrl?: string;
 }
 
 export default function ChannelFinder() {
@@ -108,6 +110,9 @@ export default function ChannelFinder() {
                                 />
                                 <div className="channel-info" style={{ flex: 1 }}>
                                     <h4>{channel.title}</h4>
+                                    {channel.handle && (
+                                        <span className="text-sm" style={{ color: 'var(--accent-primary)' }}>{channel.handle}</span>
+                                    )}
                                     <p className="text-sm text-muted" style={{
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
@@ -146,7 +151,7 @@ export default function ChannelFinder() {
 
                             <div className="flex gap-2 mt-4">
                                 <a
-                                    href={`https://youtube.com/channel/${channel.id}`}
+                                    href={channel.youtubeUrl || `https://youtube.com/${channel.handle || '@' + channel.id}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="btn btn-secondary btn-sm"

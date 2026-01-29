@@ -38,28 +38,33 @@ export async function handler(event) {
         // Use AI to recommend channels in this niche
         const systemPrompt = `You are a YouTube expert with extensive knowledge of creators across all niches as of January 2026. You know the most successful and growing channels in every category.
 
-When asked about a niche, provide REAL YouTube channels that exist and are active. Include a mix of:
+CRITICAL: You must provide REAL YouTube channel names that actually exist. Include their actual YouTube channel handle (the @username) so users can find them.
+
+When asked about a niche, provide REAL channels including:
 - Large established channels (1M+ subscribers)
 - Medium growing channels (100K-1M subscribers)  
 - Rising stars (10K-100K subscribers)
 
-Be accurate with channel names and approximate statistics based on your knowledge.`;
+Be accurate with channel names - these must be real channels that exist on YouTube.`;
 
-        const userPrompt = `Find 8-10 top YouTube channels in the "${query}" niche.
+        const userPrompt = `Find 8-10 REAL YouTube channels in the "${query}" niche.
+
+IMPORTANT: Only include channels that actually exist on YouTube as of 2026. Include their real @handle.
 
 For each channel, provide:
-- Exact channel name (real channels only)
-- Approximate subscriber count (as of 2026)
-- Approximate total video count
-- Approximate total view count
-- Brief description of their content (1-2 sentences)
+- Exact channel name (MUST be real)
+- Their YouTube @handle (like @MrBeast, @veritasium, etc.)
+- Approximate subscriber count (based on your knowledge)
+- Approximate video count
+- Brief description (1-2 sentences about what they create)
 
 Return as JSON array with this exact format:
 [
   {
-    "id": "channel-name-slug",
-    "title": "Channel Name",
-    "description": "Brief description of what they create",
+    "id": "channel-handle",
+    "handle": "@ChannelHandle",
+    "title": "Real Channel Name",
+    "description": "Brief description of their content style",
     "thumbnail": "",
     "subscriberCount": "1500000",
     "videoCount": "250",
@@ -67,7 +72,7 @@ Return as JSON array with this exact format:
   }
 ]
 
-Only return the JSON array, no other text.`;
+Only return the JSON array, no other text. Every channel MUST be a real YouTube channel.`;
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -81,7 +86,7 @@ Only return the JSON array, no other text.`;
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.7,
+                temperature: 0.6,
                 max_tokens: 2000
             })
         });
@@ -113,11 +118,17 @@ Only return the JSON array, no other text.`;
             channels = [];
         }
 
-        // Add placeholder thumbnails
-        channels = channels.map(ch => ({
-            ...ch,
-            thumbnail: `https://ui-avatars.com/api/?name=${encodeURIComponent(ch.title)}&size=88&background=6366f1&color=fff`
-        }));
+        // Add proper thumbnails and YouTube links
+        channels = channels.map(ch => {
+            const handle = ch.handle || `@${ch.id}`;
+            return {
+                ...ch,
+                handle: handle,
+                // Use the handle to create proper YouTube channel URL
+                youtubeUrl: `https://www.youtube.com/${handle}`,
+                thumbnail: `https://ui-avatars.com/api/?name=${encodeURIComponent(ch.title)}&size=88&background=6366f1&color=fff&bold=true`
+            };
+        });
 
         // Sort by subscriber count (highest first)
         channels.sort((a, b) => parseInt(b.subscriberCount || 0) - parseInt(a.subscriberCount || 0));

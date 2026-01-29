@@ -1,4 +1,4 @@
-// Transcribe YouTube video
+// Transcribe YouTube video using multiple methods
 export async function handler(event) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -25,45 +25,35 @@ export async function handler(event) {
             };
         }
 
-        // First, get video title using YouTube API
-        const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-        let videoTitle = 'YouTube Video';
+        console.log('Attempting to transcribe video:', videoId);
 
-        if (YOUTUBE_API_KEY) {
-            try {
-                const videoInfoRes = await fetch(
-                    `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
-                );
-                const videoInfo = await videoInfoRes.json();
-                if (videoInfo.items && videoInfo.items.length > 0) {
-                    videoTitle = videoInfo.items[0].snippet.title;
-                }
-            } catch (e) {
-                console.log('Could not fetch video title:', e);
+        // Get video title first
+        let videoTitle = 'YouTube Video';
+        try {
+            const oembedRes = await fetch(
+                `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+            );
+            if (oembedRes.ok) {
+                const oembed = await oembedRes.json();
+                videoTitle = oembed.title || 'YouTube Video';
             }
+        } catch (e) {
+            console.log('Could not fetch video title');
         }
 
-        // Try multiple transcript sources
         let transcript = null;
 
-        // Method 1: Try youtubetranscript.com API
+        // Method 1: Use the public transcript API
         try {
             const transcriptRes = await fetch(
-                `https://youtubetranscript.com/?server_vid2=${videoId}`
+                `https://www.searchapi.io/api/v1/search?engine=youtube_transcripts&video_id=${videoId}&api_key=demo`
             );
             if (transcriptRes.ok) {
-                const text = await transcriptRes.text();
-                // Parse the XML-like response
-                const matches = text.match(/<text[^>]*>([^<]*)<\/text>/g);
-                if (matches && matches.length > 0) {
-                    transcript = matches
-                        .map(m => m.replace(/<[^>]*>/g, ''))
+                const data = await transcriptRes.json();
+                if (data.transcripts && data.transcripts.length > 0) {
+                    transcript = data.transcripts
+                        .map(t => t.text)
                         .join(' ')
-                        .replace(/&amp;/g, '&')
-                        .replace(/&lt;/g, '<')
-                        .replace(/&gt;/g, '>')
-                        .replace(/&#39;/g, "'")
-                        .replace(/&quot;/g, '"')
                         .replace(/\s+/g, ' ')
                         .trim();
                 }
@@ -72,28 +62,17 @@ export async function handler(event) {
             console.log('Method 1 failed:', e.message);
         }
 
-        // Method 2: Try YouTube's timedtext API directly
+        // Method 2: Try kome.ai transcript API
         if (!transcript) {
             try {
-                const captionUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-                const captionRes = await fetch(captionUrl);
-
-                if (captionRes.ok) {
-                    const text = await captionRes.text();
-                    if (text && text.trim()) {
-                        try {
-                            const captionData = JSON.parse(text);
-                            if (captionData.events) {
-                                transcript = captionData.events
-                                    .filter(e => e.segs)
-                                    .map(e => e.segs.map(s => s.utf8 || '').join(''))
-                                    .join(' ')
-                                    .replace(/\s+/g, ' ')
-                                    .trim();
-                            }
-                        } catch (parseErr) {
-                            console.log('Could not parse caption data');
-                        }
+                const komeRes = await fetch(
+                    `https://kome.ai/api/transcript?url=https://www.youtube.com/watch?v=${videoId}`,
+                    { headers: { 'Accept': 'application/json' } }
+                );
+                if (komeRes.ok) {
+                    const komeData = await komeRes.json();
+                    if (komeData.transcript) {
+                        transcript = komeData.transcript;
                     }
                 }
             } catch (e) {
@@ -101,32 +80,60 @@ export async function handler(event) {
             }
         }
 
-        // Method 3: Try the lemnoslife API with better error handling
+        // Method 3: Use Groq AI to generate a summary/content based on video ID
+        // This serves as a fallback when transcripts aren't available
         if (!transcript) {
-            try {
-                const transcriptResponse = await fetch(
-                    `https://yt.lemnoslife.com/videos?part=transcript&id=${videoId}`
-                );
+            const GROQ_API_KEY = process.env.GROQ_API_KEY;
+            if (GROQ_API_KEY) {
+                try {
+                    const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${GROQ_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'llama-3.3-70b-versatile',
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: 'You are a helpful assistant that provides information about YouTube videos based on their titles and context.'
+                                },
+                                {
+                                    role: 'user',
+                                    content: `I'm trying to analyze a YouTube video titled "${videoTitle}" (Video ID: ${videoId}). 
+                                    
+Since I couldn't retrieve the transcript, please provide:
+1. What this video is likely about based on the title
+2. Key topics that would typically be covered
+3. A suggested structure for similar content
 
-                if (transcriptResponse.ok) {
-                    const text = await transcriptResponse.text();
-                    if (text && text.trim()) {
-                        try {
-                            const data = JSON.parse(text);
-                            if (data.items && data.items[0] && data.items[0].transcript && data.items[0].transcript.content) {
-                                transcript = data.items[0].transcript.content
-                                    .map(entry => entry.text)
-                                    .join(' ')
-                                    .replace(/\s+/g, ' ')
-                                    .trim();
-                            }
-                        } catch (parseErr) {
-                            console.log('Could not parse lemnoslife data');
+Format your response as if it were a transcript summary. Be helpful and informative.`
+                                }
+                            ],
+                            temperature: 0.7,
+                            max_tokens: 1500
+                        })
+                    });
+
+                    if (aiRes.ok) {
+                        const aiData = await aiRes.json();
+                        const aiContent = aiData.choices[0]?.message?.content;
+                        if (aiContent) {
+                            return {
+                                statusCode: 200,
+                                headers,
+                                body: JSON.stringify({
+                                    transcript: `[AI-Generated Analysis - Transcript not available]\n\n${aiContent}`,
+                                    title: videoTitle,
+                                    isAIGenerated: true
+                                })
+                            };
                         }
                     }
+                } catch (e) {
+                    console.log('AI fallback failed:', e.message);
                 }
-            } catch (e) {
-                console.log('Method 3 failed:', e.message);
             }
         }
 
@@ -135,7 +142,7 @@ export async function handler(event) {
                 statusCode: 400,
                 headers,
                 body: JSON.stringify({
-                    error: 'Could not fetch transcript. This video may not have captions enabled, or captions are auto-generated in a different language.'
+                    error: 'Could not fetch transcript. The video may not have captions, or captions are disabled. Try a different video with manual captions.'
                 })
             };
         }

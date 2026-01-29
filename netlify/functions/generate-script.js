@@ -1,4 +1,4 @@
-// Generate viral script using Groq AI
+// Generate viral script using Groq AI with 2026 content trends
 export async function handler(event) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -45,45 +45,79 @@ export async function handler(event) {
         const length = lengthParams[scriptLength] || lengthParams.medium;
         const platformName = platform === 'tiktok' ? 'TikTok' : 'YouTube';
 
-        const systemPrompt = `You are an expert viral content creator and scriptwriter who has generated scripts for videos with millions of views. You understand what makes content go viral on ${platformName}.
+        const systemPrompt = `You are an elite viral content creator and scriptwriter as of January 2026. You have deep knowledge of:
 
-Your scripts are known for:
-- Compelling hooks that stop the scroll in the first 3 seconds
-- Natural, conversational language that sounds human (not AI-generated)
-- Strategic pattern interrupts to maintain attention
-- Emotional storytelling that connects with viewers
-- Clear value delivery that keeps viewers watching
-- Strong calls to action that drive engagement
-- SEO-optimized titles and descriptions
+CURRENT 2026 TRENDS:
+- AI-enhanced storytelling and content creation
+- Split-screen reaction content
+- "Story time" format with visual hooks
+- Educational entertainment ("edutainment")
+- Controversial takes with evidence
+- Raw, unfiltered authenticity over polish
+- Community-driven content (duets, stitches, replies)
+- Short-form documentary style
+- "POV" and first-person narratives
+- Hook-based content structure
 
-You write scripts that feel authentic, relatable, and shareable.`;
+ALGORITHM INSIGHTS (2026):
+- First 1-3 seconds determine 70% of video performance
+- Comment engagement weighted heavily
+- Watch time and rewatch rate are primary metrics
+- Shares/Saves matter more than likes
+- Posting at non-peak times can help new creators
+- Series content gets algorithmic boost
 
-        const userPrompt = `Create a viral ${platformName} script for the "${niche}" niche${topic ? ` about "${topic}"` : ''}.
+YOUR EXPERTISE:
+- Creating hooks that stop scrollers instantly
+- Writing in authentic, conversational voice
+- Building tension and payoff within scripts
+- Using pattern interrupts every 8-15 seconds
+- Crafting share-worthy moments
+- SEO optimization for discoverability
+- Platform-specific optimization
 
-Requirements:
-- Length: ${length.words} words (approximately ${length.duration})
-- Platform: ${platformName} ${platform === 'tiktok' ? '(fast-paced, trendy, younger audience)' : '(can be more detailed, wider demographics)'}
-- Must include a pattern-interrupt hook in the first line
-- Write in a conversational, authentic tone
-- Include 2-3 "golden nuggets" of value
-- End with a strong call to action
+Your scripts consistently go viral because they feel REAL, not scripted.`;
 
-Please format your script with:
+        const userPrompt = `Create a VIRAL ${platformName} script for the "${niche}" niche${topic ? ` about "${topic}"` : ''}.
 
-**🎬 TITLE OPTIONS** (3 SEO-optimized title options)
+DATE: January 2026
+PLATFORM: ${platformName} ${platform === 'tiktok' ? '(Gen Z/Alpha, fast-paced, trend-aware)' : '(broader demographics, more depth allowed)'}
+LENGTH: ${length.words} words (${length.duration})
 
-**🎯 HOOK** (First 3 seconds - the most important part)
+REQUIREMENTS:
+1. Pattern-interrupt HOOK in the FIRST LINE that creates instant curiosity
+2. Authentic, conversational tone (NOT robotic or AI-sounding)
+3. 2-3 "golden nuggets" of genuinely valuable information
+4. Built-in engagement prompts (questions, calls to comment)
+5. Strong CTA that drives follows/subscribes
+6. Current 2026 references and trends where relevant
+
+FORMAT YOUR RESPONSE AS:
+
+**🎬 TITLE OPTIONS**
+(3 click-worthy, SEO-optimized titles - use numbers, power words, curiosity gaps)
+
+**🎯 THE HOOK** (First 3 seconds)
+[The exact words to say - this MUST stop the scroll]
 
 **📜 FULL SCRIPT**
-(The complete script with natural pauses and emphasis marked)
+[Complete script with [PAUSE], [EMPHASIS], and [B-ROLL: description] markers]
+
+**🔥 VIRAL ELEMENTS BREAKDOWN**
+- Why this hook works
+- Key retention moments
+- Shareability factors
 
 **🏷️ HASHTAGS & KEYWORDS**
-(Relevant tags for ${platformName})
+[Platform-optimized tags for ${platformName}]
 
 **💡 CREATOR NOTES**
-(Tips for delivery, b-roll suggestions, etc.)
+- Delivery tips
+- Visual suggestions
+- Best time to post
+- Engagement strategy
 
-Make it sound human, engaging, and shareable!`;
+Make it feel like a real creator wrote this - natural, engaging, and SHAREABLE!`;
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -98,7 +132,7 @@ Make it sound human, engaging, and shareable!`;
                     { role: 'user', content: userPrompt }
                 ],
                 temperature: 0.85,
-                max_tokens: 3000
+                max_tokens: 4000
             })
         });
 
